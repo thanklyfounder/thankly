@@ -24,7 +24,7 @@ function formatServerName(name: string) {
 export default async function ServerTipPage({ params }: PageProps) {
   const { server } = await params;
   const displayName = formatServerName(server);
-  const pageUrl = `http://localhost:3000/${server}`;
+  const pageUrl = `https://thankly-jade.vercel.app/${server}`;
 
   return (
     <main className="min-h-screen bg-white flex items-center justify-center px-4 py-8">
