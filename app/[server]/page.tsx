@@ -42,7 +42,7 @@ export default function ServerTipPage({ params }: PageProps) {
       <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
         <div className="bg-gradient-to-b from-sky-600 to-sky-700 px-6 py-6 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/70">
-            Thankly
+            Thankly sync test
           </p>
 
           <h1 className="mt-2 text-2xl font-semibold text-white">
