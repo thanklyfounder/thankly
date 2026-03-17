@@ -27,30 +27,38 @@ export default async function ServerTipPage({ params }: PageProps) {
   const pageUrl = `https://thankly-jade.vercel.app/${server}`;
 
   return (
-    <main className="min-h-screen bg-white flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-sm rounded-2xl border border-gray-200 p-6 shadow-sm">
-        <p className="text-sm text-gray-500 text-center mb-2">Tip directly</p>
+    <main className="min-h-screen bg-neutral-50 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-lg shadow-black/5 border border-black/5">
+        <div className="text-center">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-neutral-400">
+            Thankly
+          </p>
 
-        <h1 className="text-3xl font-bold text-center text-gray-900">
-          Tip {displayName}
-        </h1>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-neutral-900">
+            Tip {displayName}
+          </h1>
 
-        <p className="text-center text-gray-600 mt-2 mb-6">No cash needed</p>
-
-        <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-6 flex justify-center">
-          <QRCode value={pageUrl} size={180} />
+          <p className="mt-2 text-sm text-neutral-500">
+            A simple way to say thank you.
+          </p>
         </div>
 
-        <p className="text-xs text-center text-gray-400 break-all mb-6">
-          {pageUrl}
-        </p>
+        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <div className="flex justify-center rounded-xl bg-white p-4">
+            <QRCode value={pageUrl} size={170} />
+          </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-4">
+          <p className="mt-3 text-center text-xs text-neutral-500">
+            Scan to open this tip page on your phone
+          </p>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
           <a
             href={tipLinks.five}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl border border-gray-300 py-3 text-lg font-semibold hover:bg-gray-50 text-center cursor-pointer"
+            className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-900 transition hover:bg-neutral-50"
           >
             $5
           </a>
@@ -59,7 +67,7 @@ export default async function ServerTipPage({ params }: PageProps) {
             href={tipLinks.ten}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl border border-gray-300 py-3 text-lg font-semibold hover:bg-gray-50 text-center cursor-pointer"
+            className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-900 transition hover:bg-neutral-50"
           >
             $10
           </a>
@@ -68,12 +76,12 @@ export default async function ServerTipPage({ params }: PageProps) {
             href={tipLinks.fifteen}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl border border-gray-300 py-3 text-lg font-semibold hover:bg-gray-50 text-center cursor-pointer"
+            className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-900 transition hover:bg-neutral-50"
           >
             $15
           </a>
 
-          <button className="rounded-xl border border-gray-300 py-3 text-lg font-semibold hover:bg-gray-50">
+          <button className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-400">
             Custom
           </button>
         </div>
@@ -82,13 +90,13 @@ export default async function ServerTipPage({ params }: PageProps) {
           href={tipLinks.ten}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full rounded-xl bg-black text-white py-3 text-lg font-semibold hover:opacity-90 text-center cursor-pointer"
+          className="mt-6 block w-full rounded-2xl bg-black py-3.5 text-center text-base font-semibold text-white transition hover:opacity-90"
         >
           Tip now
         </a>
 
-        <p className="text-xs text-gray-400 text-center mt-4">
-          Powered by Thankly
+        <p className="mt-4 text-center text-xs text-neutral-400">
+          No cash needed • Secure checkout with Stripe
         </p>
       </div>
     </main>
