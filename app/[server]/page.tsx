@@ -1,3 +1,6 @@
+"use client";
+
+import { use, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 
 type PageProps = {
@@ -12,6 +15,8 @@ const tipLinks = {
   fifteen: "https://buy.stripe.com/test_8x2dR3e3KbRrdM22na8g002",
 };
 
+type TipAmount = "five" | "ten" | "fifteen";
+
 function formatServerName(name: string) {
   if (!name) return "Server";
 
@@ -21,83 +26,103 @@ function formatServerName(name: string) {
     .join(" ");
 }
 
-export default async function ServerTipPage({ params }: PageProps) {
-  const { server } = await params;
+export default function ServerTipPage({ params }: PageProps) {
+  const { server } = use(params);
+
   const displayName = formatServerName(server);
   const pageUrl = `https://thankly-jade.vercel.app/${server}`;
+  const [selectedAmount, setSelectedAmount] = useState<TipAmount>("ten");
+
+  const continueLink = useMemo(() => {
+    return tipLinks[selectedAmount];
+  }, [selectedAmount]);
 
   return (
-    <main className="min-h-screen bg-neutral-50 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-lg shadow-black/5 border border-black/5">
-        <div className="text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-neutral-400">
+    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
+        <div className="bg-gradient-to-b from-sky-600 to-sky-700 px-6 py-6 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/70">
             Thankly
           </p>
 
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-neutral-900">
-            Tip {displayName}
+          <h1 className="mt-2 text-2xl font-semibold text-white">
+            Thank {displayName}
           </h1>
 
-          <p className="mt-2 text-sm text-neutral-500">
-            A simple way to say thank you.
+          <p className="mt-1 text-xs text-white/80">
+            Make their day in seconds
           </p>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-          <div className="flex justify-center rounded-xl bg-white p-4">
-            <QRCode value={pageUrl} size={170} />
+        <div className="bg-white px-6 py-6">
+          <div className="rounded-2xl bg-slate-50 p-4 border border-slate-200">
+            <div className="flex justify-center rounded-xl bg-white p-4 shadow-sm">
+              <QRCode value={pageUrl} size={150} />
+            </div>
+
+            <p className="mt-3 text-center text-xs text-slate-500">
+              Scan to open on your phone
+            </p>
           </div>
 
-          <p className="mt-3 text-center text-xs text-neutral-500">
-            Scan to open this tip page on your phone
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedAmount("five")}
+              className={`rounded-2xl py-4 text-center text-lg font-semibold shadow-sm transition ${
+                selectedAmount === "five"
+                  ? "border border-sky-300 bg-sky-50 text-sky-900 ring-2 ring-sky-200"
+                  : "border border-sky-100 bg-white text-slate-900 hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:shadow-md"
+              }`}
+            >
+              $5
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedAmount("ten")}
+              className={`rounded-2xl py-4 text-center text-lg font-semibold shadow-sm transition ${
+                selectedAmount === "ten"
+                  ? "border border-sky-300 bg-sky-50 text-sky-900 ring-2 ring-sky-200"
+                  : "border border-sky-100 bg-white text-slate-900 hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:shadow-md"
+              }`}
+            >
+              $10
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedAmount("fifteen")}
+              className={`rounded-2xl py-4 text-center text-lg font-semibold shadow-sm transition ${
+                selectedAmount === "fifteen"
+                  ? "border border-sky-300 bg-sky-50 text-sky-900 ring-2 ring-sky-200"
+                  : "border border-sky-100 bg-white text-slate-900 hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:shadow-md"
+              }`}
+            >
+              $15
+            </button>
+
+            <button
+              type="button"
+              className="rounded-2xl border border-dashed border-slate-200 bg-white py-4 text-center text-lg font-semibold text-slate-400"
+            >
+              Custom
+            </button>
+          </div>
+
+          <a
+            href={continueLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 block w-full rounded-2xl bg-gradient-to-b from-sky-600 to-sky-500 py-4 text-center text-base font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:-translate-y-0.5 hover:from-sky-700 hover:to-sky-600"
+          >
+            Continue
+          </a>
+
+          <p className="mt-3 text-center text-xs text-slate-400">
+            Secure checkout with Stripe
           </p>
         </div>
-
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <a
-            href={tipLinks.five}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-900 transition hover:bg-neutral-50"
-          >
-            $5
-          </a>
-
-          <a
-            href={tipLinks.ten}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-900 transition hover:bg-neutral-50"
-          >
-            $10
-          </a>
-
-          <a
-            href={tipLinks.fifteen}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-900 transition hover:bg-neutral-50"
-          >
-            $15
-          </a>
-
-          <button className="rounded-2xl border border-neutral-200 bg-white py-3 text-center text-lg font-semibold text-neutral-400">
-            Custom
-          </button>
-        </div>
-
-        <a
-          href={tipLinks.ten}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-6 block w-full rounded-2xl bg-black py-3.5 text-center text-base font-semibold text-white transition hover:opacity-90"
-        >
-          Tip now
-        </a>
-
-        <p className="mt-4 text-center text-xs text-neutral-400">
-          No cash needed • Secure checkout with Stripe
-        </p>
       </div>
     </main>
   );
