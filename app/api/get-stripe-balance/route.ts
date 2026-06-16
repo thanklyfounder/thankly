@@ -30,9 +30,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const balance = await stripe.balance.retrieve({
-      stripeAccount: worker.stripe_account_id,
-    });
+    const balance = await stripe.balance.retrieve(
+      undefined,
+      {
+        stripeAccount: worker.stripe_account_id,
+      }
+    );
 
     return NextResponse.json({
       available: balance.available,
