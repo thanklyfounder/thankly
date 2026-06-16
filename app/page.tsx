@@ -86,7 +86,7 @@ export default function HomePage() {
             </h1>
 
             <p className="text-lg text-white/75 leading-relaxed mb-10 max-w-[480px]">
-              Thankly is the bilingual financial platform built for tipped hospitality workers. Collect digital tips, track every dollar, and build your financial future — all in one place.
+              Thankly is the bilingual financial platform built for service workers. Collect digital tips, track every dollar, and build your financial future — all in one place.
             </p>
 
             <div className="flex flex-wrap gap-4">
