@@ -1,158 +1,223 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
-}
+type Language = "en" | "es";
 
 export default function CreatePage() {
+  const [language, setLanguage] = useState<Language>("en");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [createdSlug, setCreatedSlug] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
 
-  async function handleCreate() {
+  const t = {
+    title:
+      language === "en"
+        ? "Set up your Thankly"
+        : "Configura tu Thankly",
+
+    subtitle:
+      language === "en"
+        ? "Step 1 of 3 — Create your profile"
+        : "Paso 1 de 3 — Crea tu perfil",
+
+    profile:
+      language === "en" ? "1 Profile" : "1 Perfil",
+
+    payouts:
+      language === "en" ? "2 Payouts" : "2 Pagos",
+
+    ready:
+      language === "en" ? "3 Ready" : "3 Listo",
+
+    placeholder:
+      language === "en"
+        ? "Your name (e.g. Maria)"
+        : "Tu nombre (ej. María)",
+
+    continue:
+      language === "en"
+        ? "Continue to payouts"
+        : "Continuar a pagos",
+
+    processing:
+      language === "en"
+        ? "Processing..."
+        : "Procesando...",
+
+    secure:
+      language === "en"
+        ? "Secure Stripe onboarding"
+        : "Conexión segura con Stripe",
+
+    missingName:
+      language === "en"
+        ? "Please enter your name."
+        : "Ingresa tu nombre.",
+
+    loginRequired:
+      language === "en"
+        ? "You must be logged in first."
+        : "Debes iniciar sesión primero.",
+  };
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.email) {
+        setUserEmail(user.email);
+
+        const suggestedName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email.split("@")[0];
+
+        setName(suggestedName ?? "");
+      }
+    }
+
+    loadUser();
+  }, []);
+
+  async function handleContinue() {
     setErrorMessage("");
-    setCopied(false);
 
     const trimmedName = name.trim();
+
     if (!trimmedName) {
-      setErrorMessage("Please enter your name.");
+      setErrorMessage(t.missingName);
       return;
     }
 
-    const baseSlug = slugify(trimmedName);
-
     setLoading(true);
 
-    let finalSlug = baseSlug;
-    let created = false;
-    let attempt = 1;
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-    while (!created) {
-      const { error } = await supabase.from("servers").insert({
-        name: trimmedName,
-        slug: finalSlug,
-      });
+    if (error || !user) {
+      setLoading(false);
+      setErrorMessage(t.loginRequired);
+      return;
+    }
 
-      if (!error) {
-        created = true;
-        break;
-      }
+    const response = await fetch("/api/create-account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        authUserId: user.id,
+        email: user.email ?? "",
+        fullName: trimmedName,
+      }),
+    });
 
-      const message = error.message.toLowerCase();
+    const data = await response.json();
 
-      if (message.includes("duplicate") || message.includes("unique")) {
-        attempt += 1;
-        finalSlug = `${baseSlug}-${attempt}`;
-      } else {
-        setLoading(false);
-        setErrorMessage(error.message);
-        return;
-      }
+    if (data.url) {
+      window.location.href = data.url;
+      return;
     }
 
     setLoading(false);
-    setCreatedSlug(finalSlug);
+    setErrorMessage(data.error || "Unable to continue.");
   }
-
-  async function handleCopy() {
-    const url = `https://thankly-jade.vercel.app/${createdSlug}`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-  }
-
-  const createdUrl = createdSlug
-    ? `https://thankly-jade.vercel.app/${createdSlug}`
-    : "";
 
   return (
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
-        <div className="bg-gradient-to-b from-sky-600 to-sky-700 px-6 py-6 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white/70">
-            Thankly
-          </p>
+        <div className="bg-gradient-to-b from-sky-700 to-sky-900 px-6 py-6 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                className={`rounded-full px-3 py-1 ${
+                  language === "en"
+                    ? "bg-white text-sky-700"
+                    : "text-white/80"
+                }`}
+              >
+                English
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLanguage("es")}
+                className={`rounded-full px-3 py-1 ${
+                  language === "es"
+                    ? "bg-white text-sky-700"
+                    : "text-white/80"
+                }`}
+              >
+                Español
+              </button>
+            </div>
+          </div>
 
           <h1 className="mt-2 text-2xl font-semibold text-white">
-            Create your page
+            {t.title}
           </h1>
 
           <p className="mt-1 text-xs text-white/80">
-            Get your personal Thankly link
+            {t.subtitle}
           </p>
+
+          <div className="mt-4 flex justify-center gap-2 text-[10px] text-white/80">
+            <span className="rounded-full bg-white/30 px-2 py-1">
+              {t.profile}
+            </span>
+
+            <span className="rounded-full bg-white/10 px-2 py-1">
+              {t.payouts}
+            </span>
+
+            <span className="rounded-full bg-white/10 px-2 py-1">
+              {t.ready}
+            </span>
+          </div>
         </div>
 
         <div className="bg-white px-6 py-6">
-          {!createdSlug ? (
-            <>
-              <input
-                type="text"
-                placeholder="Your name (e.g. Maria)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
+          <input
+            type="text"
+            placeholder={t.placeholder}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
 
-              {errorMessage ? (
-                <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
-              ) : null}
+          {userEmail ? (
+            <p className="mt-3 text-xs text-slate-400">
+              {userEmail}
+            </p>
+          ) : null}
 
-              <button
-                onClick={handleCreate}
-                disabled={loading}
-                className="mt-4 w-full rounded-2xl bg-sky-600 py-3 text-white font-semibold hover:bg-sky-700 transition disabled:opacity-60"
-              >
-                {loading ? "Creating..." : "Create my page"}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-center">
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Your page is ready
-                </h2>
+          {errorMessage ? (
+            <p className="mt-3 text-sm text-red-600">
+              {errorMessage}
+            </p>
+          ) : null}
 
-                <p className="mt-2 break-all text-sm text-slate-600">
-                  {createdUrl}
-                </p>
-              </div>
+          <button
+            type="button"
+            onClick={handleContinue}
+            disabled={loading}
+            className="mt-5 w-full rounded-2xl bg-emerald-600 py-3 text-white font-semibold hover:bg-emerald-700 transition disabled:opacity-60"
+          >
+            {loading ? t.processing : t.continue}
+          </button>
 
-              <button
-                onClick={handleCopy}
-                className="mt-4 w-full rounded-2xl border border-slate-200 bg-white py-3 font-semibold text-slate-900 hover:bg-slate-50 transition"
-              >
-                {copied ? "Copied" : "Copy link"}
-              </button>
-
-              <a
-                href={createdUrl}
-                className="mt-3 block w-full rounded-2xl bg-sky-600 py-3 text-center font-semibold text-white hover:bg-sky-700 transition"
-              >
-                Visit my page
-              </a>
-
-              <button
-                onClick={() => {
-                  setName("");
-                  setCreatedSlug("");
-                  setCopied(false);
-                  setErrorMessage("");
-                }}
-                className="mt-3 w-full rounded-2xl border border-dashed border-slate-200 bg-white py-3 font-semibold text-slate-500 hover:bg-slate-50 transition"
-              >
-                Create another
-              </button>
-            </>
-          )}
+          <p className="mt-3 text-center text-xs text-slate-400">
+            {t.secure}
+          </p>
         </div>
       </div>
     </main>
