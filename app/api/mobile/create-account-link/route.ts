@@ -113,10 +113,11 @@ export async function POST(req: NextRequest) {
 
     const accountLink = await stripe.accountLinks.create({
       account: stripeAccountId,
-      refresh_url: "http://192.168.1.125:3000/stripe-return",
-      return_url: "http://192.168.1.125:3000/stripe-return",
+      refresh_url: `http://192.168.1.125:3000/stripe-return?account=${stripeAccountId}`,
+      return_url: `http://192.168.1.125:3000/stripe-return?account=${stripeAccountId}`,
       type: "account_onboarding",
     });
+
 
     return NextResponse.json({
       url: accountLink.url,

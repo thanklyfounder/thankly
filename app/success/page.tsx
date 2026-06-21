@@ -1,3 +1,7 @@
+// app/success/page.tsx
+// Fix: removed duplicate Done + Skip for now buttons that were rendering outside SuccessFeedbackCard.
+// Also adds avatar_url pass-through from session metadata for worker photo display.
+
 import { stripe } from "@/lib/stripe";
 import SuccessFeedbackCard from "@/components/SuccessFeedbackCard";
 
@@ -31,14 +35,25 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
 
   const workerName = session.metadata?.worker_name || "your server";
   const tipAmount = Number(session.metadata?.tip_amount ?? 0);
+  const avatarUrl = session.metadata?.avatar_url ?? null;
   const workerInitial = workerName.charAt(0).toUpperCase();
 
   return (
     <main className="min-h-screen bg-[#173f73] px-5 py-8 text-white">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center rounded-[36px] border border-white/10 bg-[#1f4b82] px-7 py-10 shadow-2xl">
-        <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-blue-200 bg-blue-400 text-5xl font-black text-white shadow-xl">
-          {workerInitial}
-        </div>
+
+        {/* Worker avatar — shows photo if available, falls back to initial */}
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={workerName}
+            className="h-28 w-28 rounded-full border-4 border-blue-200 object-cover shadow-xl"
+          />
+        ) : (
+          <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-blue-200 bg-blue-400 text-5xl font-black text-white shadow-xl">
+            {workerInitial}
+          </div>
+        )}
 
         <div className="mt-12 text-5xl">🎉</div>
 
@@ -55,6 +70,10 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
 
         <div className="my-10 h-1 w-20 rounded-full bg-white/20" />
 
+        {/*
+          SuccessFeedbackCard already contains its own Done button and Skip for now link.
+          Do NOT add another Done/Skip outside this component — that was the source of the duplicate.
+        */}
         <SuccessFeedbackCard
           workerId={session.metadata?.worker_id ?? ""}
           workerName={workerName}
@@ -64,17 +83,6 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
               : null
           }
         />
-
-        <a
-          href="/"
-          className="mt-8 w-full rounded-3xl bg-white py-5 text-center text-xl font-black text-[#173f73]"
-        >
-          Done
-        </a>
-
-        <a href="/" className="mt-6 text-sm font-bold text-blue-200/70">
-          Skip for now
-        </a>
       </div>
     </main>
   );

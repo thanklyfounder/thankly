@@ -1,6 +1,10 @@
+// thankly-mobile/app/(tabs)/payouts.tsx
+// Full replacement — adds payout method selection and working Initiate Payout handler
+
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -21,6 +25,8 @@ import {
 
 const API_BASE_URL = "http://192.168.1.125:3000";
 const isAndroid = Platform.OS === "android";
+
+type PayoutMethod = "standard" | "instant";
 
 type Worker = {
   id: string;
@@ -55,8 +61,13 @@ export default function PayoutsScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [connectingStripe, setConnectingStripe] = useState(false);
+  const [initiatingPayout, setInitiatingPayout] = useState(false);
   const [availableBalance, setAvailableBalance] = useState(0);
   const [pendingBalance, setPendingBalance] = useState(0);
+
+  // Track which payout method the user has selected
+  const [selectedMethod, setSelectedMethod] = useState<PayoutMethod>("standard");
+
   const { t } = useLanguage();
 
   async function loadStripeBalance() {
@@ -65,12 +76,8 @@ export default function PayoutsScreen() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/mobile/get-stripe-balance`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          authUserId: user.id,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authUserId: user.id }),
       });
 
       if (!response.ok) {
@@ -79,12 +86,8 @@ export default function PayoutsScreen() {
       }
 
       const data = await response.json();
-
-      const available = data.available?.[0]?.amount ?? 0;
-      const pending = data.pending?.[0]?.amount ?? 0;
-
-      setAvailableBalance(available);
-      setPendingBalance(pending);
+      setAvailableBalance(data.available?.[0]?.amount ?? 0);
+      setPendingBalance(data.pending?.[0]?.amount ?? 0);
     } catch (error) {
       console.error("Stripe balance load error:", error);
     }
@@ -108,13 +111,14 @@ export default function PayoutsScreen() {
     React.useCallback(() => {
       async function loadPayoutData() {
         if (!user?.id) return;
-
         try {
           setLoading(true);
-
-          const currentWorker = await getCurrentWorker(user.id);
+          // Fetch worker + Stripe balance in parallel instead of sequentially
+          const [currentWorker] = await Promise.all([
+            getCurrentWorker(user.id),
+            loadStripeBalance(),
+          ]);
           setWorker(currentWorker);
-
           if (currentWorker?.id) {
             const txs = await getWorkerTransactions(currentWorker.id);
             setTransactions(txs);
@@ -125,7 +129,6 @@ export default function PayoutsScreen() {
           setLoading(false);
         }
       }
-
       loadPayoutData();
     }, [user?.id])
   );
@@ -139,20 +142,15 @@ export default function PayoutsScreen() {
     try {
       setConnectingStripe(true);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/mobile/create-account-link`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            authUserId: user.id,
-            email: user.email,
-            fullName: user.email.split("@")[0],
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/mobile/create-account-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          authUserId: user.id,
+          email: user.email,
+          fullName: user.email.split("@")[0],
+        }),
+      });
 
       const data = await response.json();
 
@@ -161,17 +159,75 @@ export default function PayoutsScreen() {
         return;
       }
 
-      await WebBrowser.openAuthSessionAsync(
-        data.url,
-        "thanklymobile://stripe-return"
-      );
-
+      await WebBrowser.openAuthSessionAsync(data.url, "thanklymobile://stripe-return");
       await refreshPayoutData();
     } catch (error) {
       console.error("Stripe onboarding failed:", error);
     } finally {
       setConnectingStripe(false);
     }
+  }
+
+  async function handleInitiatePayout() {
+    if (!user?.id) return;
+
+    if (availableBalance <= 0) {
+      Alert.alert("No Balance", "You have no available balance to pay out.");
+      return;
+    }
+
+    Alert.alert(
+      "Confirm Payout",
+      `Initiate a ${selectedMethod} payout of ${formatDollars(availableBalance)}?\n\n${
+        selectedMethod === "instant"
+          ? "Arrives in minutes."
+          : "Arrives in 1–2 business days."
+      }`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: async () => {
+            try {
+              setInitiatingPayout(true);
+
+              const response = await fetch(`${API_BASE_URL}/api/mobile/initiate-payout`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  authUserId: user.id,
+                  method: selectedMethod,
+                }),
+              });
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                Alert.alert("Payout Failed", data.error ?? "Something went wrong.");
+                return;
+              }
+
+              Alert.alert(
+                "Payout Initiated",
+                `${formatDollars(data.amount)} is on its way.\n\nEstimated arrival: ${
+                  selectedMethod === "instant"
+                    ? "Within minutes"
+                    : "1–2 business days"
+                }`
+              );
+
+              // Refresh balance after payout
+              await refreshPayoutData();
+            } catch (error) {
+              console.error("Initiate payout error:", error);
+              Alert.alert("Error", "Could not connect to server. Please try again.");
+            } finally {
+              setInitiatingPayout(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   const completedTransactions = useMemo(
@@ -198,14 +254,11 @@ export default function PayoutsScreen() {
         <SectionHeader
           title={t.payouts.title}
           subtitle={t.payouts.subtitle}
-          statusText={
-            isStripeConnected
-              ? t.payouts.connected
-              : t.payouts.notConnected
-          }
+          statusText={isStripeConnected ? t.payouts.connected : t.payouts.notConnected}
           statusType={isStripeConnected ? "success" : "warning"}
         />
 
+        {/* Balance Card */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>{t.payouts.available}</Text>
           <Text style={styles.balanceValue}>{formatDollars(availableBalance)}</Text>
@@ -215,34 +268,57 @@ export default function PayoutsScreen() {
           </Text>
         </View>
 
+        {/* Payout Method Selection — now functional */}
         <View style={styles.optionsRow}>
-          <TouchableOpacity style={styles.optionCard}>
-            <Text style={styles.optionTitle}>{t.payouts.instant} ›</Text><Text style={styles.chevron}></Text>
-
+          <TouchableOpacity
+            style={[
+              styles.optionCard,
+              selectedMethod === "instant" && styles.optionCardSelected,
+            ]}
+            onPress={() => setSelectedMethod("instant")}
+          >
+            <Text
+              style={[
+                styles.optionTitle,
+                selectedMethod === "instant" && styles.optionTitleSelected,
+              ]}
+            >
+              {t.payouts.instant} ›
+            </Text>
             <Text style={styles.optionSubtitle}>{t.payouts.instantsub}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionCard}>
-            <Text style={styles.optionTitle}>{t.payouts.standard} ›</Text><Text style={styles.chevron}></Text>
+          <TouchableOpacity
+            style={[
+              styles.optionCard,
+              selectedMethod === "standard" && styles.optionCardSelected,
+            ]}
+            onPress={() => setSelectedMethod("standard")}
+          >
+            <Text
+              style={[
+                styles.optionTitle,
+                selectedMethod === "standard" && styles.optionTitleSelected,
+              ]}
+            >
+              {t.payouts.standard} ›
+            </Text>
             <Text style={styles.optionSubtitle}>{t.payouts.standardsub}</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Connected Account Status */}
         <View style={styles.bankCard}>
           <Text style={styles.cardTitle}>{t.payouts.connectedAct}</Text>
-
           <View style={styles.bankRow}>
             <View>
               <Text style={styles.bankName}>
                 {isStripeConnected ? "Stripe Express" : t.payouts.setupreq}
               </Text>
               <Text style={styles.bankDetail}>
-                {isStripeConnected
-                  ? t.payouts.bankaccverified
-                  : t.payouts.stripeconnect}
+                {isStripeConnected ? t.payouts.bankaccverified : t.payouts.stripeconnect}
               </Text>
             </View>
-
             <View style={isStripeConnected ? styles.verifiedBadge : styles.pendingBadge}>
               <Text style={isStripeConnected ? styles.verifiedText : styles.pendingText}>
                 {isStripeConnected ? t.payouts.verified : t.payouts.pending}
@@ -251,20 +327,27 @@ export default function PayoutsScreen() {
           </View>
         </View>
 
+        {/* Primary Action Button — now correctly wired */}
         <TouchableOpacity
-          style={[styles.primaryButton, connectingStripe && styles.disabledButton]}
-          onPress={isStripeConnected ? undefined : handleStripeOnboarding}
-          disabled={connectingStripe}
+          style={[
+            styles.primaryButton,
+            (connectingStripe || initiatingPayout) && styles.disabledButton,
+          ]}
+          onPress={isStripeConnected ? handleInitiatePayout : handleStripeOnboarding}
+          disabled={connectingStripe || initiatingPayout}
         >
           <Text style={styles.primaryText}>
             {connectingStripe
               ? "Opening Stripe..."
+              : initiatingPayout
+              ? "Processing..."
               : isStripeConnected
-                ? t.payouts.initiate
-                : t.payouts.connectfirst}
+              ? t.payouts.initiate
+              : t.payouts.connectfirst}
           </Text>
         </TouchableOpacity>
 
+        {/* Recent Payout-Eligible Tips */}
         <View style={styles.historyCard}>
           <Text style={styles.cardTitle}>{t.payouts.recentpayout}</Text>
 
@@ -279,7 +362,6 @@ export default function PayoutsScreen() {
                   <Text style={styles.historyDate}>{formatDate(item.created_at)}</Text>
                   <Text style={styles.historyStatus}>{item.status}</Text>
                 </View>
-
                 <Text style={styles.historyAmount}>
                   {formatDollars(item.worker_receives)}
                 </Text>
@@ -316,7 +398,6 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 34,
     alignItems: "center",
   },
-
   title: {
     marginTop: 0,
     color: "white",
@@ -328,7 +409,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-
   statusBadge: {
     marginTop: 12,
     backgroundColor: "#dcfce7",
@@ -356,7 +436,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     backgroundColor: "white",
     borderRadius: 30,
-    padding: isAndroid? 16 : 24,
+    padding: isAndroid ? 16 : 24,
     alignItems: "center",
   },
   balanceLabel: { color: "#64748b", fontSize: 14, fontWeight: "800" },
@@ -377,7 +457,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  optionsRow: { marginTop: isAndroid? 8: 10, flexDirection: "row", gap: 14 },
+  optionsRow: { marginTop: isAndroid ? 8 : 10, flexDirection: "row", gap: 14 },
   optionCard: {
     flex: 1,
     backgroundColor: "#eff6ff",
@@ -386,18 +466,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 10,
     paddingVertical: isAndroid ? 16 : 18,
-    paddingHorizontal: isAndroid? 16: 18,
+    paddingHorizontal: isAndroid ? 16 : 18,
     minHeight: 0,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     elevation: 5,
     borderWidth: 1,
     borderColor: "#bfdbfe",
   },
-
-  optionTitle: { color: "#0f172a", fontSize: isAndroid? 18 : 18, fontWeight: "700" },
+  // NEW: selected state only — added for method selection
+  optionCardSelected: {
+    borderColor: "#0284c7",
+    borderWidth: 2,
+    backgroundColor: "#dbeafe",
+  },
+  optionTitle: { color: "#0f172a", fontSize: isAndroid ? 18 : 18, fontWeight: "700" },
+  // NEW: selected state only — added for method selection
+  optionTitleSelected: {
+    color: "#0284c7",
+  },
   optionSubtitle: {
     marginTop: 0,
     color: "#64748b",
@@ -405,14 +491,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   bankCard: {
-    marginTop: isAndroid? 8 : 10,
+    marginTop: isAndroid ? 8 : 10,
     backgroundColor: "white",
     borderRadius: 26,
-    padding: isAndroid? 20 : 22,
+    padding: isAndroid ? 20 : 22,
   },
   cardTitle: { color: "#0f172a", fontSize: 22, fontWeight: "700" },
   bankRow: {
-    marginTop: isAndroid? 8 : 10,
+    marginTop: isAndroid ? 8 : 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -434,7 +520,7 @@ const styles = StyleSheet.create({
   },
   pendingText: { color: "#92400e", fontSize: 12, fontWeight: "800" },
   primaryButton: {
-    marginTop: isAndroid? 8 : 10,
+    marginTop: isAndroid ? 8 : 10,
     backgroundColor: "#0284c7",
     borderRadius: 24,
     padding: 18,

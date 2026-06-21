@@ -269,7 +269,7 @@ export default function HomePage() {
               Thankly is built in English and Spanish from the ground up — not translated, conversion-optimized. Every screen, every notification, every dollar.
             </p>
             <a href="#founding" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] transition-colors">
-              Únete gratis — Join Free
+               Join Free — Únete gratis
             </a>
           </div>
 

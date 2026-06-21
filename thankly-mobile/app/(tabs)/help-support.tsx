@@ -30,6 +30,9 @@ export default function HelpSupportScreen() {
     await Linking.openURL(url);
   }
 
+  async function openSupportPage() {
+  await Linking.openURL('https://getthankly.com/support')
+  }
   async function emailBilling() {
     await Linking.openURL(
       "mailto:billing@getthankly.com?subject=Thankly Billing Question"
@@ -72,6 +75,10 @@ export default function HelpSupportScreen() {
           />
         </View>
 
+        <TouchableOpacity style={styles.webSupportButton} onPress={openSupportPage}>
+          <Text style={styles.webSupportText}>View full support page →</Text>
+        </TouchableOpacity>
+        
         <View style={styles.card}>
           <Text style={styles.title}>{t.helpsupport.faq}</Text>
 
@@ -204,5 +211,19 @@ const styles = StyleSheet.create({
     color: "#64748b",
     fontSize: 14,
     lineHeight: 21,
+  },
+  webSupportButton: {
+    marginTop: 12,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  webSupportText: {
+    color: '#1B3A6B',
+    fontWeight: '700',
+    fontSize: isAndroid ? 14 : 15,
   },
 });
