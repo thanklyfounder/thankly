@@ -44,9 +44,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(SANDBOX_MOCK_BALANCE);
     }
 
-    const balance = await stripe.balance.retrieve({
-      stripeAccount: worker.stripe_account_id,
-    });
+    const balance = await stripe.balance.retrieve(
+      {},
+      { stripeAccount: worker.stripe_account_id }
+    );
 
     return NextResponse.json({
       available: balance.available,
