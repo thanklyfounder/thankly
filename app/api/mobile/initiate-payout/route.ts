@@ -58,9 +58,10 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Live mode: fetch real balance ---
-    const balance = await stripe.balance.retrieve({
-      stripeAccount: worker.stripe_account_id,
-    });
+    const balance = await stripe.balance.retrieve(
+      {},
+      { stripeAccount: worker.stripe_account_id }
+    );
 
     const availableUSD = balance.available.find((b) => b.currency === "usd");
     const availableAmount = availableUSD?.amount ?? 0;
