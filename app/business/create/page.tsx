@@ -113,6 +113,23 @@ export default function CreateBusinessPage() {
     });
 
     if (error) {
+      // If already registered, try signing in automatically
+      if (error.message.toLowerCase().includes("already registered")) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (signInError) {
+          setLoading(false);
+          setErrorMessage("This email is already registered. Please check your password and try Sign in.");
+          return;
+        }
+
+        await createBusiness(signInData.user?.id);
+        return;
+      }
+
       setLoading(false);
       setErrorMessage(error.message);
       return;
