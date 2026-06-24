@@ -65,16 +65,14 @@ export default function CreateBusinessPage() {
   }
 
   async function createBusiness(userId?: string) {
-    async function createBusiness(userId?: string) {
     setLoading(true);
     setErrorMessage("");
 
     let ownerAuthUserId = userId;
 
     if (!ownerAuthUserId) {
-      const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       ownerAuthUserId = user?.id;
-      console.log("Session check:", { userId: user?.id, sessionError });
     }
 
     if (!ownerAuthUserId) {
@@ -105,7 +103,6 @@ export default function CreateBusinessPage() {
 
   async function handleCreateAccountAndBusiness() {
     setErrorMessage("");
-
     if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
     if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
 
@@ -117,34 +114,41 @@ export default function CreateBusinessPage() {
     });
 
     if (error) {
-      // If already registered, try signing in automatically
       if (error.message.toLowerCase().includes("already registered")) {
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
-
         if (signInError) {
           setLoading(false);
           setErrorMessage("This email is already registered. Please check your password and try Sign in.");
           return;
         }
-
         await createBusiness(signInData.user?.id);
         return;
       }
-
       setLoading(false);
       setErrorMessage(error.message);
       return;
     }
 
-    await createBusiness(data.user?.id);
+    // Sign in immediately after signup to guarantee a session
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (signInError || !signInData.user?.id) {
+      setLoading(false);
+      setErrorMessage("Account created but unable to sign in. Please try signing in.");
+      return;
+    }
+
+    await createBusiness(signInData.user.id);
   }
 
   async function handleSignInAndBusiness() {
     setErrorMessage("");
-
     if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
     if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
 
@@ -176,7 +180,6 @@ export default function CreateBusinessPage() {
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
 
-        {/* Header */}
         <div className="bg-gradient-to-b from-teal-700 to-blue-950 px-6 py-6 text-center">
           <div className="mb-4 flex justify-center">
             <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white">
@@ -205,7 +208,6 @@ export default function CreateBusinessPage() {
           )}
         </div>
 
-        {/* Step 1 — Business name */}
         {step === "name" && (
           <div className="p-6">
             <input
@@ -215,11 +217,9 @@ export default function CreateBusinessPage() {
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               onKeyDown={(e) => e.key === "Enter" && handleNameNext()}
             />
-
             {errorMessage ? (
               <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
             ) : null}
-
             <button
               type="button"
               onClick={handleNameNext}
@@ -231,7 +231,6 @@ export default function CreateBusinessPage() {
           </div>
         )}
 
-        {/* Step 2 — Account creation (only if not authenticated) */}
         {step === "account" && (
           <div className="p-6">
             <button
@@ -241,7 +240,6 @@ export default function CreateBusinessPage() {
             >
               ← {businessName}
             </button>
-
             <input
               type="email"
               value={email}
@@ -249,7 +247,6 @@ export default function CreateBusinessPage() {
               placeholder={t.emailPlaceholder}
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
-
             <input
               type="password"
               value={password}
@@ -257,11 +254,9 @@ export default function CreateBusinessPage() {
               placeholder={t.passwordPlaceholder}
               className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
-
             {errorMessage ? (
               <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
             ) : null}
-
             <button
               type="button"
               onClick={handleCreateAccountAndBusiness}
@@ -270,7 +265,6 @@ export default function CreateBusinessPage() {
             >
               {loading ? t.loading : t.createAccount}
             </button>
-
             <div className="mt-4 flex items-center justify-center gap-1 text-sm text-slate-500">
               <span>{t.alreadyHaveAccount}</span>
               <button
