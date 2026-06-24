@@ -143,67 +143,72 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 120 },
 
   card: {
-    marginTop: 18,
+    marginTop: 10,
     backgroundColor: "white",
     borderRadius: 28,
-    padding: 22,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
   },
 
   title: {
-    fontSize: isAndroid? 20 : 22,
+    fontSize: isAndroid ? 15 : 16,
     fontWeight: "700",
     color: "#0f172a",
-    marginBottom: 16,
-  },
-
-  text: {
-    fontSize: 15,
-    color: "#475569",
-    lineHeight: 24,
     marginBottom: 10,
   },
 
+  text: {
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+
   keepActiveButton: {
-    marginTop: 24,
+    marginTop: 16,
     backgroundColor: "#dbeafe",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
   keepActiveText: {
     color: "#0f3f73",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "800",
   },
   
   deactivateButton: {
-    marginTop: 12,
+    marginTop: 10,
     backgroundColor: "white",
     borderWidth: 2,
     borderColor: "#dc2626",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
   deactivateText: {
     color: "#dc2626",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "800",
   },
 
   deleteButton: {
-    marginTop: 12,
+    marginTop: 10,
     backgroundColor: "#64748b",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
   deleteText: {
     color: "white",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "800",
   },
 });

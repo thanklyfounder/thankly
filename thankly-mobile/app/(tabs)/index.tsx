@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import {
   ActivityIndicator,
   Animated,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -15,7 +16,7 @@ import React from "react";
 import { Image } from "react-native";
 import qrTabIcon from "../../assets/images/thankly-qr-tab-icon.png";
 import { useLanguage } from "@/contexts/LanguageContext";
-
+import { supabase } from "@/lib/supabase";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback } from "react";
 import { useFocusEffect } from "expo-router";
@@ -109,6 +110,10 @@ export default function HomeScreen() {
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const weeklyData = getLast7DayEarnings(transactions);
+  const [businessLinks, setBusinessLinks] = useState<{ business_id: string; businesses: { name: string } | null }[]>([]);
+  const [activeShift, setActiveShift] = useState<{ id: string; business_id: string | null; is_personal: boolean; businesses?: { name: string } | null } | null>(null);
+  const [showShiftModal, setShowShiftModal] = useState(false);
+
 
   const animatedBars = useRef(
     Array.from({ length: 7 }, () => new Animated.Value(0))
@@ -132,7 +137,25 @@ export default function HomeScreen() {
 
             const feedbackRows = await getWorkerFeedback(currentWorker.id);
             setFeedback(feedbackRows);
+
+              // Load business links
+            const { data: links } = await supabase
+              .from("business_workers")
+              .select("business_id, businesses(name)")
+              .eq("worker_id", currentWorker.id)
+              .eq("status", "active");
+            setBusinessLinks((links as any) ?? []);
+
+            // Load active shift
+            const shiftRes = await fetch(
+              `${process.env.EXPO_PUBLIC_API_URL}/api/mobile/shift/active?authUserId=${user.id}`
+            );
+            if (shiftRes.ok) {
+              const shiftData = await shiftRes.json();
+              setActiveShift(shiftData.shift ?? null);
+            }
           }
+          
         } catch (error) {
           console.error("Home load error:", error);
         } finally {
@@ -285,6 +308,20 @@ export default function HomeScreen() {
           </View>
         </LinearGradient>
 
+        {businessLinks.length > 0 && (
+          <TouchableOpacity
+            style={activeShift ? styles.shiftBannerActive : styles.shiftBannerIdle}
+            onPress={() => setShowShiftModal(true)}
+          >
+            <Text style={activeShift ? styles.shiftBannerTextActive : styles.shiftBannerTextIdle}>
+              {activeShift
+                ? `● On shift — ${activeShift.is_personal ? "Personal / Independent" : (activeShift.businesses?.name ?? "Business")}`
+                : "Working today? Start a shift to organize tips by workplace."}
+            </Text>
+            <Text style={styles.shiftBannerCaret}>›</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.actionsRow}>
           <TouchableOpacity
             style={styles.actionButtonSecondary}
@@ -393,12 +430,210 @@ export default function HomeScreen() {
             ))
           )}
         </View>
-      </ScrollView>
+            </ScrollView>
+
+      <Modal
+        visible={showShiftModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowShiftModal(false)}
+      >
+        <View style={styles.shiftModalOverlay}>
+          <View style={styles.shiftModalCard}>
+            <Text style={styles.shiftModalTitle}>
+              {activeShift ? "Manage Shift" : "Where are you working today?"}
+            </Text>
+
+            {activeShift && (
+              <TouchableOpacity
+                style={styles.shiftEndButton}
+                onPress={async () => {
+                  await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/mobile/shift/end`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ authUserId: user?.id }),
+                  });
+                  setActiveShift(null);
+                  setShowShiftModal(false);
+                }}
+              >
+                <Text style={styles.shiftEndText}>End current shift</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.shiftOption}
+              onPress={async () => {
+                const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/mobile/shift/start`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ authUserId: user?.id, isPersonal: true }),
+                });
+                const data = await res.json();
+                setActiveShift(data.shift);
+                setShowShiftModal(false);
+              }}
+            >
+              <Text style={styles.shiftOptionText}>Personal / Independent</Text>
+            </TouchableOpacity>
+
+            {businessLinks.map((link) => (
+              <TouchableOpacity
+                key={link.business_id}
+                style={styles.shiftOption}
+                onPress={async () => {
+                  const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/mobile/shift/start`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      authUserId: user?.id,
+                      businessId: link.business_id,
+                      isPersonal: false,
+                    }),
+                  });
+                  const data = await res.json();
+                  setActiveShift(data.shift);
+                  setShowShiftModal(false);
+                }}
+              >
+                <Text style={styles.shiftOptionText}>{link.businesses?.name ?? "Business"}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              style={styles.shiftAddBusiness}
+              onPress={() => {
+                setShowShiftModal(false);
+                router.push("/(tabs)/settings");
+              }}
+            >
+              <Text style={styles.shiftAddBusinessText}>+ Link a workplace</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.shiftModalCancel}
+              onPress={() => setShowShiftModal(false)}
+            >
+              <Text style={styles.shiftModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+    shiftBannerActive: {
+    marginTop: 10,
+    marginBottom: 2,
+    backgroundColor: "#dcfce7",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#86efac",
+  },
+  shiftBannerIdle: {
+    marginTop: 10,
+    marginBottom: 2,
+    backgroundColor: "#eff6ff",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+  },
+  shiftBannerTextActive: {
+    flex: 1,
+    color: "#166534",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  shiftBannerTextIdle: {
+    flex: 1,
+    color: "#1e40af",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  shiftBannerCaret: {
+    color: "#94a3b8",
+    fontSize: 18,
+    marginLeft: 8,
+  },
+  shiftModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  shiftModalCard: {
+    width: "100%",
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 20,
+  },
+  shiftModalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 14,
+  },
+  shiftOption: {
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    backgroundColor: "#f8fafc",
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  shiftOptionText: {
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  shiftEndButton: {
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    backgroundColor: "#fee2e2",
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    alignItems: "center",
+  },
+  shiftEndText: {
+    color: "#dc2626",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  shiftAddBusiness: {
+    paddingVertical: 11,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  shiftAddBusinessText: {
+    color: "#0284c7",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  shiftModalCancel: {
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  shiftModalCancelText: {
+    color: "#94a3b8",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   loadingContainer: {
     flex: 1,
     backgroundColor: "#f1f5f9",
@@ -412,8 +647,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 20,
-    paddingBottom: 120,
+    padding: 16,
+    paddingBottom: 100,
+    overflow: "hidden",
   },
 
   header: {
@@ -501,9 +737,9 @@ const styles = StyleSheet.create({
   },
 
   actionIconImage: {
-    width: 24,
-    height: 24,
-    marginBottom: 8,
+    width: 22,
+    height: 22,
+    marginBottom: 4,
     opacity: 0.75,
   },
 
@@ -541,23 +777,23 @@ const styles = StyleSheet.create({
   
   financeTitle: {
     color: "#0f172a",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
-    marginBottom: 16,
+    marginBottom: 8,
     letterSpacing: -0.5,
   },
 
   financeBuckets: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 4,
+    gap: 10,
+    marginTop: 2,
   },
 
   safeBucket: {
     flex: 1.25,
     backgroundColor: "white",
     borderRadius: 22,
-    padding: 18,
+    padding: 12,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -572,7 +808,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8fafc",
     borderRadius: 22,
-    padding: 18,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#dbeafe",
   },
@@ -662,7 +898,7 @@ const styles = StyleSheet.create({
   statValueLight: {
     marginTop: 6,
     color: "white",
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: "900",
   },
 
@@ -701,18 +937,18 @@ const styles = StyleSheet.create({
   },
 
   headerLogo: {
-    paddingTop: 10,
+    paddingTop: 4,
     width: 360,
-    height: 125,
-    marginTop: 10,
-    marginBottom: 1,
+    height: 72,
+    marginTop: 2,
+    marginBottom: 0,
     alignItems: "center",
   },
   performanceCard: {
-    marginTop: 14,
+    marginTop: 8,
     backgroundColor: "#ffffff",
-    borderRadius: 32,
-    padding: 5,
+    borderRadius: 24,
+    padding: 4,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.18)",
   },
@@ -721,10 +957,11 @@ const styles = StyleSheet.create({
   actionButtonSecondary: {
     flex: 1,
     backgroundColor: "#eff6ff",
-    borderRadius: 26,
-    paddingVertical: 20,
-    height: 85,
+    borderRadius: 18,
+    paddingVertical: 0,
+    height: 62,
     alignItems: "center",
+    justifyContent: "center",
     shadowColor: "#0f172a",
     shadowOpacity: 0.08,
     shadowRadius: 10,
@@ -746,9 +983,9 @@ const styles = StyleSheet.create({
   actionButtonPrimary: {
     flex: 1,
     backgroundColor: "#dbeafe",
-    borderRadius: 26,
-    height: 85,
-    paddingVertical: 20,
+    borderRadius: 18,
+    height: 64,
+    paddingVertical: 0,
     alignItems: "center",
     shadowColor: "#0f172a",
     shadowOpacity: 0.1,
@@ -790,7 +1027,7 @@ const styles = StyleSheet.create({
   statValue: {
     marginTop: 6,
     color: "#0f172a",
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: "900",
   },
 
@@ -873,9 +1110,10 @@ const styles = StyleSheet.create({
   },
 
   actionsRow: {
-    marginTop: 20,
+    marginTop: 8,
     flexDirection: "row",
-    gap: 14,
+    gap: 12,
+    alignItems: "stretch",
   },
 
   actionButton: {
@@ -908,10 +1146,10 @@ const styles = StyleSheet.create({
   },
 
   financeCard: {
-    marginTop: 8,
-    marginHorizontal: 4,
+    marginTop: 6,
+    marginHorizontal: 0,
     backgroundColor: "#edf7ee",
-    borderRadius: 28,
+    borderRadius: 24,
     padding: 10,
   },
 
@@ -966,10 +1204,10 @@ const styles = StyleSheet.create({
   },
 
   praiseCard: {
-    marginTop: 16,
+    marginTop: 6,
     backgroundColor: "white",
-    borderRadius: 28,
-    padding: 22,
+    borderRadius: 24,
+    padding: 12,
   },
 
   ratingText: {
@@ -988,10 +1226,10 @@ const styles = StyleSheet.create({
   },
 
   activityCard: {
-    marginTop: 16,
+    marginTop: 6,
     backgroundColor: "white",
     borderRadius: 28,
-    padding: 22,
+    padding: 14,
   },
 
   activityHeader: {
@@ -1002,7 +1240,7 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     color: "#0f172a",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "700",
   },
 

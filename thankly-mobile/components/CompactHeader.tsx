@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Platform, Image, StyleSheet, Text, View } from "react-native";
 
 
 type CompactHeaderProps = {
@@ -12,6 +12,7 @@ type CompactHeaderProps = {
   showAvatar?: boolean;
 };
 
+const isAndroid = Platform.OS === "android";
 
 export default function CompactHeader({
   title,
@@ -23,7 +24,6 @@ export default function CompactHeader({
   showAvatar = true,
 }: CompactHeaderProps) {
   const isSuccess = statusType === "success";
-
 
   return (
     <LinearGradient
@@ -68,8 +68,8 @@ const styles = StyleSheet.create({
   header: {
     marginHorizontal: -20,
     marginTop: -20,
-    paddingTop: 30,
-    paddingBottom: 15,
+    paddingTop: 20,
+    paddingBottom: isAndroid? 6 : 8,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
@@ -85,8 +85,8 @@ const styles = StyleSheet.create({
 
 
   headerAvatarCircle: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     borderRadius: 50,
     backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
@@ -98,8 +98,8 @@ const styles = StyleSheet.create({
 
 
   headerAvatar: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     borderRadius: 50,
   },
 
@@ -121,9 +121,10 @@ const styles = StyleSheet.create({
   title: {
     marginTop: 0,
     color: "white",
-    fontSize: 24,
+    fontSize: isAndroid? 22 : 24,
     fontWeight: "700",
     textAlign: "center",
+    paddingBottom: 5,
   },
 
 
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: "#dbeafe",
     textAlign: "center",
-    fontSize: 14,
+    fontSize: isAndroid? 12 : 14,
     lineHeight: 20,
   },
 

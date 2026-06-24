@@ -39,7 +39,6 @@ export default function AuthScreen() {
 
     router.replace("/");
   }
-
   async function createAccount() {
     if (!email || !password) {
       Alert.alert("Missing information", "Enter email and password.");
@@ -64,6 +63,24 @@ export default function AuthScreen() {
       "Account created",
       "Your Thankly account has been created. You can now sign in."
     );
+  }
+
+  async function forgotPassword() {
+    if (!email.trim()) {
+      Alert.alert("Enter your email", "Type your email address above, then tap Forgot Password.");
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: "thanklymobile://reset-password",
+    });
+
+    if (error) {
+      Alert.alert("Error", error.message);
+      return;
+    }
+
+    Alert.alert("Check your email", "A password reset link has been sent to " + email.trim() + ".");
   }
 
   return (
@@ -100,6 +117,13 @@ export default function AuthScreen() {
             secureTextEntry
             style={styles.input}
           />
+
+          <TouchableOpacity
+            style={styles.forgotPassword}
+            onPress={forgotPassword}
+          >
+            <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.button}
@@ -149,20 +173,20 @@ const styles = StyleSheet.create({
   authBrandHeader: {
     width: "100%",
     backgroundColor: "#0F4C81",
-    height: 245,
+    height: 160,
     alignItems: "center",
     justifyContent: "center",
   },
 
   headerLogo: {
-    width: 185,
-    height: 185,
+    width: 150,
+    height: 150,
     resizeMode: "contain",
   },
   formSection: {
     paddingHorizontal: 28,
-    paddingTop: 38,
-    paddingBottom: 34,
+    paddingTop: 24,
+    paddingBottom: 24,
   },
   authAppIcon: {
     width: 170,
@@ -178,59 +202,72 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    marginTop: 24,
-    fontSize: 28,
+    marginTop: 18,
+    fontSize: 24,
     fontWeight: "800",
     color: "#0f172a",
     textAlign: "center",
   },
 
   subtitle: {
-    marginTop: 10,
+    marginTop: 8,
     color: "#64748b",
     textAlign: "center",
-    lineHeight: 21,
+    lineHeight: 20,
+    fontSize: 13,
   },
 
   input: {
-    marginTop: 18,
+    marginTop: 14,
     borderWidth: 1,
     borderColor: "#cbd5e1",
     borderRadius: 18,
-    padding: 15,
-    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 15,
     color: "#0f172a"
   },
 
   button: {
-    marginTop: 18,
+    marginTop: 16,
     backgroundColor: "#0284c7",
     borderRadius: 18,
-    padding: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
   buttonText: {
     color: "white",
     fontWeight: "800",
-    fontSize: 16,
+    fontSize: 15,
   },
 
   secondaryButton: {
-    marginTop: 12,
+    marginTop: 10,
     borderWidth: 1,
     borderColor: "#0284c7",
     borderRadius: 18,
-    padding: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
   secondaryButtonText: {
     color: "#0284c7",
     fontWeight: "700",
-    fontSize: 16,
+    fontSize: 15,
+  },
+  forgotPassword: {
+    marginTop: 10,
+    alignSelf: "flex-end",
   },
 
+  forgotPasswordText: {
+    color: "#0284c7",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   footer: {
     marginTop: 20,
     textAlign: "center",

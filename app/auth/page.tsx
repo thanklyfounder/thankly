@@ -52,9 +52,10 @@ export default function AuthPage() {
       return;
     }
 
-    setMessage("Signed in successfully.");
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next") ?? "/create";
     setLoading(false);
-    router.push("/create");
+    router.push(next);
   }
 
   return (

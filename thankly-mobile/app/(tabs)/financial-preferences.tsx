@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { getCurrentWorker } from "@/services/workerService";
 import { Platform } from "react-native";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { LinearGradient } from "expo-linear-gradient";
 
 type Worker = {
   id: string;
@@ -40,6 +41,8 @@ export default function FinancialPreferencesScreen() {
   const [hasAcknowledgedTaxDisclaimer, setHasAcknowledgedTaxDisclaimer] =
     useState(false);
   const [saving, setSaving] = useState(false);
+  const [modalScrolledToEnd, setModalScrolledToEnd] = useState(false);
+  const [modalContentTall, setModalContentTall] = useState(false);
 
   const [worker, setWorker] = useState<{
     full_name?: string | null;
@@ -182,6 +185,8 @@ export default function FinancialPreferencesScreen() {
   function acknowledgeDisclaimer() {
     setHasAcknowledgedTaxDisclaimer(true);
     setShowTaxModal(false);
+    setModalScrolledToEnd(false);
+    setModalContentTall(false);
   }
 
   return (
@@ -289,11 +294,23 @@ export default function FinancialPreferencesScreen() {
         visible={showTaxModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowTaxModal(false)}
+        onRequestClose={() => { setShowTaxModal(false); setModalScrolledToEnd(false); setModalContentTall(false); }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.taxModalCard}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 12 }}
+              onContentSizeChange={(_, contentHeight) => {
+                setModalContentTall(contentHeight > 300);
+              }}
+              onScroll={({ nativeEvent }) => {
+                const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+                const isAtEnd = layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+                if (isAtEnd) setModalScrolledToEnd(true);
+              }}
+              scrollEventThrottle={16}
+            >
               <Text style={styles.modalTitle}>
                 {t.financialpreferences.taxfinancedisclaimer}
               </Text>
@@ -308,16 +325,20 @@ export default function FinancialPreferencesScreen() {
                 {"\n\n"}
                 {t.financialpreferences.disclaimer5}
               </Text>
-
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={acknowledgeDisclaimer}
-              >
-                <Text style={styles.primaryText}>
-                  {t.financialpreferences.gotit}
-                </Text>
-              </TouchableOpacity>
             </ScrollView>
+
+            {modalContentTall && !modalScrolledToEnd && (
+              <Text style={styles.scrollHint}>↓ scroll for more</Text>
+            )}
+
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={acknowledgeDisclaimer}
+            >
+              <Text style={styles.primaryText}>
+                {t.financialpreferences.gotit}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -330,10 +351,12 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 120 },
 
   card: {
-    marginTop: 18,
+    marginTop: 8,
     backgroundColor: "white",
     borderRadius: 28,
     padding: 22,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
 
   title: {
@@ -356,7 +379,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#bfdbfe",
     borderRadius: 999,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: isAndroid ? 18 : 20,
   },
 
@@ -437,31 +460,36 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    marginTop: 24,
+    marginTop: 18,
     backgroundColor: "#0f4c81",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
   primaryText: {
     color: "white",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "800",
   },
 
   secondaryButton: {
-    marginTop: 12,
+    marginTop: 8,
     backgroundColor: "#f8fbfc",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
+    paddingBottom: 8,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
 
   secondaryText: {
     color: "#0f172a",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "700",
   },
 
   modalOverlay: {
@@ -474,22 +502,45 @@ const styles = StyleSheet.create({
 
   taxModalCard: {
     width: "100%",
-    maxHeight: "90%",
+    maxHeight: "85%",
     backgroundColor: "white",
     borderRadius: 28,
-    padding: 24,
+    padding: 20,
+    position: "relative",
+  },
+
+  modalFadeWrap: {
+    position: "absolute",
+    bottom: 56,
+    left: 0,
+    right: 0,
+    height: 48,
+    overflow: "hidden",
+  },
+
+  modalFade: {
+    flex: 1,
+  },
+
+  scrollHint: {
+    marginTop: 12,
+    marginBottom: 4,
+    textAlign: "center",
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
   },
 
   modalTitle: {
     color: "#0f172a",
-    fontSize: 26,
+    fontSize: isAndroid? 20 : 24,
     fontWeight: "900",
     marginBottom: 18,
   },
 
   modalText: {
     color: "#475569",
-    fontSize: 16,
+    fontSize: isAndroid? 13 : 15,
     lineHeight: 24,
   },
 });

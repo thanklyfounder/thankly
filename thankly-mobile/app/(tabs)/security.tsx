@@ -212,39 +212,41 @@ const styles = StyleSheet.create({
     marginTop: 10,
     backgroundColor: "white",
     borderRadius: 28,
-    padding: isAndroid? 16 : 18,
+    paddingHorizontal: isAndroid ? 14 : 16,
+    paddingTop: 10,
+    paddingBottom: 8,
   },
 
   sectionTitle: {
     color: "#0f172a",
-    fontSize: isAndroid? 20 : 22,
+    fontSize: isAndroid? 15 : 16,
     fontWeight: "700",
     marginBottom: -3,
   },
 
   infoRow: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
 
   label: {
     color: "#64748b",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
   },
 
   value: {
-    marginTop: 4,
+    marginTop: 3,
     color: "#0f172a",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800",
   },
 
   verified: {
-    marginTop: 4,
+    marginTop: 3,
     color: "#166534",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "900",
   },
 
@@ -259,23 +261,23 @@ const styles = StyleSheet.create({
 
   rowTitle: {
     color: "#0f172a",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
     paddingTop: 0,
   },
   rowTitlebio: {
     color: "#0f172a",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
     paddingTop: 10,
     paddingBottom: 6
   },
 
   rowSubtitle: {
-    marginTop: 5,
+    marginTop: 3,
     color: "#64748b",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   warningText: {
@@ -301,7 +303,7 @@ const styles = StyleSheet.create({
   securityItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 7,
     gap: 10,
   },
 
@@ -314,12 +316,12 @@ const styles = StyleSheet.create({
   securityText: {
     flex: 1,
     color: "#475569",
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 19,
   },
 
   lockedRow: {
-    paddingVertical: 14,
+    paddingVertical: 10,
     paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
@@ -335,16 +337,19 @@ const styles = StyleSheet.create({
   },
 
   dangerButton: {
-    marginTop: 18,
+    marginTop: 12,
     backgroundColor: "#fee2e2",
-    borderRadius: 24,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#fecaca",
   },
 
   dangerText: {
     color: "#b91c1c",
     fontSize: 17,
-    fontWeight: "900",
+    fontWeight: "700",
   },
 });

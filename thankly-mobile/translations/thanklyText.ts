@@ -67,6 +67,8 @@ export const thanklyText = {
       ytd: "YTD",
       custom: "Custom",
 
+      start: "Start",
+      end: "End",
       thisMonth: "This month",
       lastMonthPeriod: "Last month",
       yearToDate: "Year to date",
@@ -90,7 +92,6 @@ export const thanklyText = {
       title: "My QR",
       scanTitle: "Scan to tip",
       subtitle: "Point your camera to open my Thankly page.",
-      qrhelper: "Large QR for easy scanning from arm’s length.",
       public: "PUBLIC TIP LINK",
       share: "Share QR",
       copy: "Copy link",
@@ -313,6 +314,7 @@ export const thanklyText = {
       legalComplianceSub:
         "Questions about policies, disclosures, or documents.",
 
+      supportwebpage: "Go to support webpage",
       faq: "Frequently Asked Questions",
 
       faqTaxesQuestion:
@@ -413,6 +415,8 @@ export const thanklyText = {
       taxPocketrate: "Basado en una tasa de ahorro de",
       savingsrate: " ",
 
+      start: "Inicio",
+      end: "Fin",
       rangeSummary: "Resumen del período",
       last7days: "Ultimos 7 días",
       month: "Mes",
@@ -448,7 +452,6 @@ export const thanklyText = {
       title: "Mi QR",
       scanTitle: "Escanea para agradecer a",
       subtitle: "Apunta tu cámara para abrir mi página de Thankly.",
-      qrhelper: "QR amplio para escanear fácilmente a distancia.",
       public: "ENLACE PÚBLICO DE PROPINAS",
       share: "Compartir QR",
       copy: "Copiar enlace",
@@ -675,6 +678,7 @@ export const thanklyText = {
       legalComplianceSub:
         "Preguntas sobre políticas, divulgaciones o documentos.",
 
+      supportwebpage: "Ir a pagina web de soporte",
       faq: "Preguntas Frecuentes",
 
       faqTaxesQuestion:

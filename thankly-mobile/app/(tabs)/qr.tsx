@@ -299,10 +299,10 @@ const styles = StyleSheet.create({
   },
 
   qrCard: {
-    marginTop: 12,
+    marginTop: 4,
     backgroundColor: "white",
     borderRadius: 34,
-    paddingTop: 22,
+    paddingTop: 8,
     paddingBottom: 10,
     alignItems: "center",
   },
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     resizeMode: "contain",
-    opacity: 0.20,
+    opacity: 0.40,
   },
 
   scanHelper: {
@@ -380,10 +380,10 @@ const styles = StyleSheet.create({
   },
 
   linkCard: {
-    marginTop: 16,
+    marginTop: 8,
     backgroundColor: "white",
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 20,
+    padding: 14,
   },
 
   label: {
@@ -402,10 +402,10 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    marginTop: 10,
+    marginTop: 8,
     backgroundColor: "#0284c7",
-    borderRadius: 24,
-    padding: 18,
+    borderRadius: 20,
+    padding: 14,
     alignItems: "center",
   },
 
@@ -416,16 +416,16 @@ const styles = StyleSheet.create({
   },
 
   buttonRow: {
-    marginTop: 12,
+    marginTop: 8,
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
   },
 
   halfButton: {
     flex: 1,
     backgroundColor: "white",
-    borderRadius: 24,
-    padding: 18,
+    borderRadius: 20,
+    padding: 13,
     alignItems: "center",
   },
 

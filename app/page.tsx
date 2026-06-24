@@ -55,7 +55,7 @@ export default function HomePage() {
           ))}
           <li>
             <a
-              href="#founding"
+              href="/create"
               className="bg-[#00B4D8] text-[#0F2347] font-bold text-sm px-5 py-2 rounded-full hover:bg-[#90E0EF] transition-colors"
             >
               Join Free
@@ -91,7 +91,7 @@ export default function HomePage() {
 
             <div className="flex flex-wrap gap-4">
               <a
-                href="#founding"
+                href="/create"
                 className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold text-base px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,180,216,0.35)] transition-all"
               >
                 Join Founding 500 — Free
@@ -276,7 +276,7 @@ export default function HomePage() {
           <div className="flex flex-col gap-4 fade-up opacity-0 translate-y-6 transition-all duration-700">
             {[
               { flag: '🇺🇸', lang: 'English', text: '"You just made Maria\'s day!"', sub: 'She received your full $20. Zero fees deducted.' },
-              { flag: '🇲🇽', lang: 'Español', text: '"¡Acabas de alegrarle el día a María!"', sub: 'Recibió tu apoyo completo de $20. Sin deducciones.' },
+              { flag: '🌎', lang: 'Español', text: '"¡Acabas de alegrarle el día a María!"', sub: 'Recibió tu apoyo completo de $20. Sin deducciones.' },
               { flag: '💳', lang: 'Tip page copy', text: '"Apoya a María" not just "Leave a tip"', sub: 'Warm, conversion-optimized Spanish throughout' },
             ].map((card) => (
               <div key={card.lang} className="bg-white/8 border border-white/12 rounded-2xl px-6 py-5 flex items-start gap-4">
@@ -315,7 +315,7 @@ export default function HomePage() {
               ))}
             </ul>
 
-            <a href="#" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
+            <a href="/create" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
               Claim your spot — It's free
             </a>
           </div>
@@ -395,7 +395,7 @@ export default function HomePage() {
           <h2 className="text-5xl font-black text-white tracking-tight leading-tight mb-4">Ready to take control<br />of your tips?</h2>
           <p className="text-white/70 text-xl mb-10">Join Thankly free. No monthly fees. No hardware. Just your money — organized, tracked, and paid out on your terms.</p>
           <div className="flex gap-4 justify-center flex-wrap">
-            <a href="#" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
+            <a href="create" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
               Get started free
             </a>
             <a href="#how-it-works" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
@@ -433,18 +433,16 @@ export default function HomePage() {
                 title: 'Support',
                 links: [
                   { href: 'mailto:hello@getthankly.com', label: 'Contact us' },
-                  { href: 'mailto:hello@getthankly.com', label: 'hello@getthankly.com' },
-                  { href: 'mailto:legal@getthankly.com', label: 'legal@getthankly.com' },
+                  { href: 'mailto:hello@getthankly.com', label: 'legal@getthankly.com' },
+                  { href: 'mailto:legal@getthankly.com', label: 'support@getthankly.com' },
                 ],
               },
               {
                 title: 'Legal',
                 links: [
-                  { href: '/privacy', label: 'Privacy Policy' },
-                  { href: '/terms', label: 'Terms of Service' },
-                  { href: '/earnings-disclaimer', label: 'Earnings Disclaimer' },
-                  { href: '/tax-disclaimer', label: 'Tax Disclaimer' },
-                  { href: '/payment-disclosure', label: 'Payment Disclosure' },
+                   { href: '/privacy', label: 'Privacy Policy' },
+                   { href: '/terms', label: 'Terms of Service' },
+                   { href: '/disclosures', label: 'Disclosures' },
                 ],
               },
             ].map((col) => (

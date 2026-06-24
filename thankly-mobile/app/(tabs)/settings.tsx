@@ -190,7 +190,7 @@ export default function SettingsScreen() {
           />
 
           <SettingsRow
-            icon="🏦"
+            icon="💳"
             title={t.settings.bankAccount}
             subtitle={t.settings.bankSubtitle}
             onPress={() => router.push("/(tabs)/bank-account")}
@@ -232,47 +232,6 @@ export default function SettingsScreen() {
           <Text style={styles.signOutText}>{t.settings.signout}</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      <Modal
-        visible={showTaxModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTaxModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Tax & Financial Disclaimer</Text>
-
-            <Text style={styles.modalText}>
-              Thankly provides estimated tax reserve calculations for informational and organizational purposes only.
-              {"\n\n"}
-              Thankly is not a bank, financial advisor, accountant, tax preparer, payroll provider, or law firm.
-              {"\n\n"}
-              No taxes are withheld, paid, or remitted by Thankly on behalf of workers.
-              {"\n\n"}
-              Users are solely responsible for tracking, reporting, and paying any applicable federal, state, or local taxes related to their earnings.
-              {"\n\n"}
-              Please consult a qualified tax professional regarding your individual tax obligations.
-            </Text>
-
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={async () => {
-                setHasAcknowledgedTaxDisclaimer(true);
-                
-                if (pendingWithholding !== null) {
-                  setWithholding(pendingWithholding);
-                  setPendingWithholding(null);
-              }
-                setShowTaxModal(false);
-//                await saveFinancialPreferences(finalWithholding);
-              }}   
-            >
-              <Text style={styles.modalButtonText}>Got it</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
     </SafeAreaView>
   );
@@ -369,7 +328,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   languageCard: {
-    marginTop: 16,
+    marginTop: 10,
     backgroundColor: "white",
     borderRadius: 26,
     padding: 5,
@@ -383,7 +342,7 @@ const styles = StyleSheet.create({
   },
 
   languageToggle: {
-    marginTop: 10,
+    marginTop: 4,
     backgroundColor: "#eff6ff",
     borderRadius: 999,
     padding: 4,
@@ -561,8 +520,8 @@ financialSaveText: {
 settingsHeader: {
   marginHorizontal: -20,
   marginTop: -20,
-  paddingBottom: 24,
-  paddingTop: isAndroid? 40 : 42,
+  paddingBottom: 8,
+  paddingTop: isAndroid? 30 : 32,
   paddingHorizontal: 24,
   borderBottomLeftRadius: 34,
   borderBottomRightRadius: 34,
@@ -579,7 +538,7 @@ settingsBrand: {
 settingsTitle: {
   marginTop: 0,
   color: "white",
-  fontSize: 28,
+  fontSize: isAndroid ? 22 : 24,
   fontWeight: "700",
   textAlign: "center",
 },
@@ -588,15 +547,9 @@ settingsSubtitle: {
   marginTop: 8,
   color: "#dbeafe",
   textAlign: "center",
-  fontSize: 14,
+  fontSize: isAndroid ? 11 : 13,
   lineHeight: 20,
 },
-  name: {
-    marginTop: 14,
-    color: "white",
-    fontSize: 30,
-    fontWeight: "900",
-  },
 
   subtitle: {
     marginTop: 8,
@@ -607,7 +560,7 @@ settingsSubtitle: {
   },
 
   card: {
-    marginTop: 10,
+    marginTop: 2,
     backgroundColor: "white",
     borderRadius: 24,
     overflow: "hidden",

@@ -184,35 +184,36 @@ const styles = StyleSheet.create({
   
   title: {
     color: "#0f172a",
-    fontSize: isAndroid? 20 : 22,
+    fontSize: isAndroid? 17 : 18,
     fontWeight: "800",
   },
 
   text: {
     marginTop: 10,
     color: "#64748b",
-    fontSize: isAndroid? 13 : 15,
-    lineHeight: 24,
+    fontSize: isAndroid ? 13 : 14,
+    lineHeight: 21,
   },
 
   statusBox: {
-    marginTop: 22,
+    marginTop: 14,
     backgroundColor: "#f8fafc",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "#dbeafe",
   },
 
   statusLabel: {
     color: "#64748b",
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
   },
 
   statusValue: {
-    marginTop: 6,
-    fontSize: 22,
+    marginTop: 4,
+    fontSize: 17,
     fontWeight: "800",
   },
 
@@ -221,16 +222,17 @@ const styles = StyleSheet.create({
   notConnected: { color: "#92400e" },
 
   primaryButton: {
-    marginTop: 24,
+    marginTop: isAndroid ? 8 : 10,
     backgroundColor: "#0f4c81",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
   primaryText: {
     color: "white",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "800",
   },
 

@@ -50,8 +50,8 @@ const styles = StyleSheet.create({
   header: {
     marginHorizontal: -20,
     marginTop: -20,
-    paddingTop: isAndroid? 40 : 42,
-    paddingBottom: isAndroid? 18 : 25,
+    paddingTop: isAndroid? 28 : 30,
+    paddingBottom: isAndroid? 12 : 16,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   title: {
     marginTop: 0,
     color: "white",
-    fontSize: isAndroid? 26 : 28,
+    fontSize: isAndroid? 22 : 24,
     fontWeight: "700",
     textAlign: "center",
   },
@@ -72,8 +72,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#dbeafe",
     textAlign: "center",
-    fontSize: isAndroid? 12 : 14,
-    lineHeight: 20,
+    fontSize: isAndroid? 11 : 13,
+    lineHeight: 18,
   },
 
 

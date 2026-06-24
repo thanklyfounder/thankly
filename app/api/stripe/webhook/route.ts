@@ -11,6 +11,7 @@ function formatDollars(cents: number) {
 
 
 export async function POST(req: NextRequest) {
+  console.log("🔥 STRIPE WEBHOOK RECEIVED");
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
 
@@ -88,9 +89,19 @@ export async function POST(req: NextRequest) {
       const availableAmount = workerReceives - taxReserveAmount;
 
 
+      // Look up active shift at tip time
+      const { data: activeShift } = await supabase
+        .from("work_shifts")
+        .select("id, business_id")
+        .eq("worker_id", workerId)
+        .is("ended_at", null)
+        .order("started_at", { ascending: false })
+        .maybeSingle();
+
       const { error } = await supabase.from("transactions").insert({
         worker_id: workerId,
-        business_id: null,
+        business_id: activeShift?.business_id ?? null,
+        shift_id: activeShift?.id ?? null,
         tip_amount: tipAmount,
         fee_amount: thanklyFee,
         stripe_fee: stripeFee,
@@ -117,10 +128,9 @@ export async function POST(req: NextRequest) {
         error: workerNotificationError,
       } = await supabase
         .from("workers")
-        .select("full_name, expo_push_token")
+        .select("full_name, expo_push_token, notify_tips")
         .eq("id", workerId)
         .single();
-
 
       if (workerNotificationError) {
         console.error(
@@ -129,8 +139,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-
-      if (workerForNotification?.expo_push_token) {
+      if (workerForNotification?.expo_push_token && workerForNotification?.notify_tips !== false) {
         await sendPushNotification({
           expoPushToken: workerForNotification.expo_push_token,
           title: `💰 ${workerForNotification.full_name}, you just received a tip!`,
@@ -183,7 +192,23 @@ export async function POST(req: NextRequest) {
         payoutsEnabled: account.payouts_enabled,
         detailsSubmitted: account.details_submitted,
       });
-}
+      if (stripeOnboarded) {
+        const { data: workerForNotification } = await supabase
+          .from("workers")
+          .select("expo_push_token, notify_account_updates")
+          .eq("stripe_account_id", account.id)
+          .single();
+
+        if (workerForNotification?.expo_push_token && workerForNotification?.notify_account_updates !== false) {
+          await sendPushNotification({
+            expoPushToken: workerForNotification.expo_push_token,
+            title: "✅ Bank account connected",
+            body: "Your Stripe account is fully verified. You're ready to receive payouts.",
+            data: { screen: "payouts" },
+          });
+        }
+      }
+    }
 
     return NextResponse.json({ received: true });
   } catch (error) {

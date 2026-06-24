@@ -1,16 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 type Language = "en" | "es";
 
 export default function CreateBusinessPage() {
+  const router = useRouter();
   const [language, setLanguage] = useState<Language>("en");
   const [businessName, setBusinessName] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
 
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.replace("/auth?next=/business/create");
+      } else {
+        setAuthChecked(true);
+      }
+    }
+    checkAuth();
+  }, []);
+
+  if (!authChecked) {
+    return (
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Checking authentication...</p>
+      </main>
+    );
+  }
   const t = {
     title: language === "en" ? "Create your business" : "Crea tu negocio",
     subtitle:

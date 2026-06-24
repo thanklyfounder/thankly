@@ -5,8 +5,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { sendPushNotification } from "@/lib/sendPushNotification";
 
 const IS_SANDBOX = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ?? false;
+
+function formatDollars(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -101,6 +106,21 @@ export async function POST(req: NextRequest) {
         stripeAccount: worker.stripe_account_id,
       }
     );
+
+    const { data: workerForNotification } = await supabase
+      .from("workers")
+      .select("expo_push_token, notify_payouts")
+      .eq("auth_user_id", authUserId)
+      .single();
+
+    if (workerForNotification?.expo_push_token && workerForNotification?.notify_payouts !== false) {
+      await sendPushNotification({
+        expoPushToken: workerForNotification.expo_push_token,
+        title: "💸 Payout initiated",
+        body: `${formatDollars(payout.amount)} is on its way. Estimated arrival: ${method === "instant" ? "within minutes" : "1–2 business days"}.`,
+        data: { screen: "payouts" },
+      });
+    }
 
     return NextResponse.json({
       success: true,

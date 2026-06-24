@@ -419,27 +419,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#cbd5e1",
-    borderRadius: 18,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    paddingHorizontal: 10,
   },
 
   tipPrefix: {
     color: "#64748b",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "900",
     marginRight: 4,
   },
 
   tipInput: {
     flex: 1,
-    paddingVertical: 14,
-    fontSize: 16,
+    paddingVertical: 9,
+    fontSize: 15,
     color: "#0f172a",
     fontWeight: "800",
   },
 
   tipPreviewLabel: {
-    marginTop: 14,
+    marginTop: 8,
     color: "#64748b",
     fontSize: 13,
     lineHeight: 19,
@@ -485,22 +485,26 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   primaryButton: {
-    marginTop: 24,
+    marginTop: 12,
     backgroundColor: "#0284c7",
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
   },
 
-  primaryText: { color: "white", fontSize: 17, fontWeight: "900" },
+  primaryText: { color: "white", fontSize: 15, fontWeight: "800" },
 
   secondaryButton: {
-    marginTop: 12,
-    backgroundColor: "#f8fafc",
-    borderRadius: 22,
-    padding: 18,
+    marginTop: 8,
+    backgroundColor: "white",
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
 
-  secondaryText: { color: "#0f172a", fontSize: 16, fontWeight: "800" },
+  secondaryText: { color: "#0f172a", fontSize: 15, fontWeight: "700" },
 });

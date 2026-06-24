@@ -128,11 +128,11 @@ const styles = StyleSheet.create({
     marginTop: 18,
     backgroundColor: "white",
     borderRadius: 28,
-    padding: 22,
+    padding: 18,
   },
 
   row: {
-    paddingVertical: 18,
+    paddingVertical: 13,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
     flexDirection: "row",
@@ -145,14 +145,14 @@ const styles = StyleSheet.create({
 
   rowTitle: {
     color: "#0f172a",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "800",
   },
 
   rowSubtitle: {
-    marginTop: 5,
+    marginTop: 3,
     color: "#64748b",
-    fontSize: 14,
+    fontSize: 13,
     lineHeight: 20,
   },
 });

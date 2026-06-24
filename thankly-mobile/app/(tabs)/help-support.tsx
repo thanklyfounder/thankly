@@ -76,7 +76,7 @@ export default function HelpSupportScreen() {
         </View>
 
         <TouchableOpacity style={styles.webSupportButton} onPress={openSupportPage}>
-          <Text style={styles.webSupportText}>View full support page →</Text>
+          <Text style={styles.webSupportText}>{t.helpsupport.supportwebpage} →</Text>
         </TouchableOpacity>
         
         <View style={styles.card}>
@@ -147,16 +147,17 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 120 },
 
   card: {
-    marginTop: 18,
+    marginTop: 10,
     backgroundColor: "white",
     borderRadius: 28,
-    padding: 18,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: isAndroid? 2 : 5,
   },
 
   title: {
     color: "#0f172a",
-    fontSize: isAndroid? 20 : 22,
+    fontSize: isAndroid? 15 : 16,
     fontWeight: "700",
     marginBottom: 0,
   },
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
 
   row: {
-    paddingVertical: 18,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
     flexDirection: "row",
@@ -179,15 +180,15 @@ const styles = StyleSheet.create({
 
   rowTitle: {
     color: "#0f172a",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
   },
 
   rowSubtitle: {
-    marginTop: 5,
+    marginTop: 3,
     color: "#64748b",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   chevron: {
@@ -197,26 +198,27 @@ const styles = StyleSheet.create({
   },
 
   faqBlock: {
-    marginTop: 18,
+    marginTop: 12,
   },
 
   question: {
     color: "#0f172a",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
   },
 
   answer: {
-    marginTop: 6,
+    marginTop: 4,
     color: "#64748b",
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 19,
   },
   webSupportButton: {
-    marginTop: 12,
+    marginTop: 10,
     backgroundColor: '#EFF6FF',
     borderRadius: 16,
-    padding: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#BFDBFE',
@@ -224,6 +226,6 @@ const styles = StyleSheet.create({
   webSupportText: {
     color: '#1B3A6B',
     fontWeight: '700',
-    fontSize: isAndroid ? 14 : 15,
+    fontSize: isAndroid ? 13 : 14,
   },
 });

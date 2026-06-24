@@ -35,6 +35,7 @@ type Worker = {
   bio_es?: string | null;
   tax_withholding_rate?: number | null;
   avatar_url?: string | null;
+  created_at?: string | null;
 };
 
 type Transaction = {
@@ -206,15 +207,15 @@ export default function ActivityScreen() {
     customStartDate,
     customEndDate,
   );
-  filteredTransactions.forEach((tx) => {
-    const txDateKey = new Date(tx.created_at).toDateString();
-    const day = days.find((item) => item.dateKey === txDateKey);
+  //filteredTransactions.forEach((tx) => {
+    //const txDateKey = new Date(tx.created_at).toDateString();
+    //const day = days.find((item) => item.dateKey === txDateKey);
 
 
-    if (day) {
-      day.amount += tx.worker_receives ?? 0;
-    }
-  });
+    //if (day) {
+      //day.amount += tx.worker_receives ?? 0;
+    //}
+  //});
   const reportPeriod = getRangeLabel(
     reportRange,
     customStartDate,
@@ -413,7 +414,7 @@ export default function ActivityScreen() {
                     style={styles.dateButton}
                     onPress={() => setShowStartPicker(true)}
                   >
-                    <Text style={styles.dateLabel}>Start</Text>
+                    <Text style={styles.dateLabel}>{t.activity.start}</Text>
                     <Text style={styles.dateValue}>
                       {customStartDate.toLocaleDateString()}
                     </Text>
@@ -423,7 +424,7 @@ export default function ActivityScreen() {
                     style={styles.dateButton}
                     onPress={() => setShowEndPicker(true)}
                   >
-                    <Text style={styles.dateLabel}>End</Text>
+                    <Text style={styles.dateLabel}>{t.activity.end}</Text>
                     <Text style={styles.dateValue}>
                       {customEndDate.toLocaleDateString()}
                     </Text>
@@ -788,8 +789,8 @@ rangeGrid: {
     marginTop: isAndroid? 5 : 7,
     backgroundColor: "white",
     borderRadius: 24,
-    padding: 18,
-    paddingVertical: isAndroid? 12 : 18,
+    padding: 14,
+    paddingVertical: isAndroid? 10 : 14,
   },
 
   weekTitle: {
@@ -861,8 +862,8 @@ rangeGrid: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 120,
-    marginTop: 30,
+    height: 80,
+    marginTop: 8,
   },
 
   barSmall: {
