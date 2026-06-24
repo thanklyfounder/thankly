@@ -16,11 +16,13 @@ export default function CreateBusinessPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
       setIsAuthenticated(!!user);
+      setCurrentUserId(user?.id);
       setAuthChecking(false);
     }
     checkAuth();
@@ -56,7 +58,7 @@ export default function CreateBusinessPage() {
       return;
     }
     if (isAuthenticated) {
-      await createBusiness();
+      await createBusiness(currentUserId);
     } else {
       setStep("account");
     }
