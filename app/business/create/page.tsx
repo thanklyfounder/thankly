@@ -65,19 +65,21 @@ export default function CreateBusinessPage() {
   }
 
   async function createBusiness(userId?: string) {
+    async function createBusiness(userId?: string) {
     setLoading(true);
     setErrorMessage("");
 
     let ownerAuthUserId = userId;
 
     if (!ownerAuthUserId) {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: sessionError } = await supabase.auth.getUser();
       ownerAuthUserId = user?.id;
+      console.log("Session check:", { userId: user?.id, sessionError });
     }
 
     if (!ownerAuthUserId) {
       setLoading(false);
-      setErrorMessage("Unable to verify your account. Please try again.");
+      setErrorMessage("Session expired — please refresh the page and try again.");
       return;
     }
 
