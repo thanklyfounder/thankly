@@ -81,6 +81,9 @@ export default function CreateBusinessPage() {
       return;
     }
 
+        console.log("Sending to API:", { name: businessName.trim(), ownerAuthUserId });
+    alert(`Sending: name="${businessName.trim()}" userId="${ownerAuthUserId}"`);
+
     const response = await fetch("/api/business/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
