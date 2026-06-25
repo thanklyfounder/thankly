@@ -84,14 +84,22 @@ export default function CreateBusinessPage() {
         console.log("Sending to API:", { name: businessName.trim(), ownerAuthUserId });
     alert(`Sending: name="${businessName.trim()}" userId="${ownerAuthUserId}"`);
 
-    const response = await fetch("/api/business/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: businessName.trim(),
-        ownerAuthUserId,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/business/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: businessName.trim(),
+          ownerAuthUserId,
+        }),
+      });
+    } catch (fetchError) {
+      setLoading(false);
+      alert(`Fetch failed: ${String(fetchError)}`);
+      setErrorMessage("Network error — please try again.");
+      return;
+    }
 
     const data = await response.json();
 

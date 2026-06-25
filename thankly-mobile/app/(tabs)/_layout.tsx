@@ -1,6 +1,6 @@
 import { Tabs, Redirect } from "expo-router";
 import React from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -9,9 +9,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Image } from "react-native";
 import qrTabIcon from "../../assets/images/thankly-qr-tab-icon.png";
 
+
 export default function TabLayout() {
   const { session, loading } = useAuth();
-
+  const isAndroid = Platform.OS === "android";
   if (loading) {
     return (
       <View
@@ -39,7 +40,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: "#0284c7",
         tabBarInactiveTintColor: "#94a3b8",
         tabBarStyle: {
-          height: 70,
+          height: isAndroid? undefined : 70,
           paddingTop: 4,
           paddingBottom: 24,
           backgroundColor: "#ffffff",
