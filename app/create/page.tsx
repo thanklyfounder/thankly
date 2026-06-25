@@ -120,14 +120,16 @@ export default function CreatePage() {
     });
 
     const data = await response.json();
+    alert(`API response: status=${response.status} data=${JSON.stringify(data)}`);
 
-    if (data.url) {
-      window.location.href = data.url;
+    if (!response.ok) {
+      setLoading(false);
+      setErrorMessage(data.error || "Unable to create business.");
       return;
     }
 
-    setLoading(false);
-    setErrorMessage(data.error || "Unable to continue.");
+    window.location.href = `/business/${data.slug}`;
+
   }
 
   return (
