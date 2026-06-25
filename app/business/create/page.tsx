@@ -16,13 +16,11 @@ export default function CreateBusinessPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
       setIsAuthenticated(!!user);
-      setCurrentUserId(user?.id);
       setAuthChecking(false);
     }
     checkAuth();
@@ -57,11 +55,7 @@ export default function CreateBusinessPage() {
       setErrorMessage(t.missingName);
       return;
     }
-    if (isAuthenticated) {
-      await createBusiness(currentUserId);
-    } else {
-      setStep("account");
-    }
+    setStep("account");
   }
 
   async function createBusiness(userId?: string) {
@@ -77,29 +71,18 @@ export default function CreateBusinessPage() {
 
     if (!ownerAuthUserId) {
       setLoading(false);
-      setErrorMessage("Session expired — please refresh the page and try again.");
+      setErrorMessage("Unable to verify your account. Please try again.");
       return;
     }
 
-        console.log("Sending to API:", { name: businessName.trim(), ownerAuthUserId });
-    alert(`Sending: name="${businessName.trim()}" userId="${ownerAuthUserId}"`);
-
-    let response: Response;
-    try {
-      response = await fetch("/api/business/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: businessName.trim(),
-          ownerAuthUserId,
-        }),
-      });
-    } catch (fetchError) {
-      setLoading(false);
-      alert(`Fetch failed: ${String(fetchError)}`);
-      setErrorMessage("Network error — please try again.");
-      return;
-    }
+    const response = await fetch("/api/business/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: businessName.trim(),
+        ownerAuthUserId,
+      }),
+    });
 
     const data = await response.json();
 
@@ -114,6 +97,7 @@ export default function CreateBusinessPage() {
 
   async function handleCreateAccountAndBusiness() {
     setErrorMessage("");
+
     if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
     if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
 
@@ -125,41 +109,17 @@ export default function CreateBusinessPage() {
     });
 
     if (error) {
-      if (error.message.toLowerCase().includes("already registered")) {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInError) {
-          setLoading(false);
-          setErrorMessage("This email is already registered. Please check your password and try Sign in.");
-          return;
-        }
-        await createBusiness(signInData.user?.id);
-        return;
-      }
       setLoading(false);
       setErrorMessage(error.message);
       return;
     }
 
-    // Sign in immediately after signup to guarantee a session
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (signInError || !signInData.user?.id) {
-      setLoading(false);
-      setErrorMessage("Account created but unable to sign in. Please try signing in.");
-      return;
-    }
-
-    await createBusiness(signInData.user.id);
+    await createBusiness(data.user?.id);
   }
 
   async function handleSignInAndBusiness() {
     setErrorMessage("");
+
     if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
     if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
 
@@ -191,6 +151,7 @@ export default function CreateBusinessPage() {
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
 
+        {/* Header */}
         <div className="bg-gradient-to-b from-teal-700 to-blue-950 px-6 py-6 text-center">
           <div className="mb-4 flex justify-center">
             <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white">
@@ -212,13 +173,12 @@ export default function CreateBusinessPage() {
           </div>
           <h1 className="text-2xl font-bold text-white">{t.title}</h1>
           <p className="mt-1 text-sm text-white/80">{t.subtitle}</p>
-          {!isAuthenticated && (
-            <p className="mt-3 text-xs text-white/60">
-              {step === "name" ? t.step1of2 : t.step2of2}
-            </p>
-          )}
+          <p className="mt-3 text-xs text-white/60">
+            {step === "name" ? t.step1of2 : t.step2of2}
+          </p>
         </div>
 
+        {/* Step 1 — Business name */}
         {step === "name" && (
           <div className="p-6">
             <input
@@ -228,20 +188,23 @@ export default function CreateBusinessPage() {
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               onKeyDown={(e) => e.key === "Enter" && handleNameNext()}
             />
+
             {errorMessage ? (
               <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
             ) : null}
+
             <button
               type="button"
               onClick={handleNameNext}
               disabled={loading}
               className="mt-5 w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
             >
-              {loading ? t.loading : isAuthenticated ? t.createBusiness : t.next}
+              {loading ? t.loading : t.next}
             </button>
           </div>
         )}
 
+        {/* Step 2 — Account creation (only if not authenticated) */}
         {step === "account" && (
           <div className="p-6">
             <button
@@ -251,6 +214,7 @@ export default function CreateBusinessPage() {
             >
               ← {businessName}
             </button>
+
             <input
               type="email"
               value={email}
@@ -258,6 +222,7 @@ export default function CreateBusinessPage() {
               placeholder={t.emailPlaceholder}
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
+
             <input
               type="password"
               value={password}
@@ -265,9 +230,11 @@ export default function CreateBusinessPage() {
               placeholder={t.passwordPlaceholder}
               className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
+
             {errorMessage ? (
               <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
             ) : null}
+
             <button
               type="button"
               onClick={handleCreateAccountAndBusiness}
@@ -276,6 +243,7 @@ export default function CreateBusinessPage() {
             >
               {loading ? t.loading : t.createAccount}
             </button>
+
             <div className="mt-4 flex items-center justify-center gap-1 text-sm text-slate-500">
               <span>{t.alreadyHaveAccount}</span>
               <button
