@@ -176,7 +176,7 @@ export default function LinkWorkplaceScreen() {
                     );
                   }}
                 >
-                  <Text style={styles.removeText}>Remove</Text>
+                  <Text style={styles.removeText}>{tl.remove}</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -274,7 +274,7 @@ export default function LinkWorkplaceScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.cancelLink} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.cancelLink} onPress={() => router.push("/(tabs)/settings")}>
           <Text style={styles.cancelText}>{tl.backToSettings}</Text>
         </TouchableOpacity>
       </ScrollView>

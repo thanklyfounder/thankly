@@ -315,8 +315,8 @@ export default function HomeScreen() {
           >
             <Text style={activeShift ? styles.shiftBannerTextActive : styles.shiftBannerTextIdle}>
               {activeShift
-                ? `● On shift — ${activeShift.is_personal ? "Personal / Independent" : (activeShift.businesses?.name ?? "Business")}`
-                : "Working today? Start a shift to organize tips by workplace."}
+                ? `${t.home.shiftBannerActive} ${activeShift.is_personal ? t.home.shiftPersonal : (activeShift.businesses?.name ?? t.home.shiftBusiness)}`
+                : t.home.shiftBannerIdle}
             </Text>
             <Text style={styles.shiftBannerCaret}>›</Text>
           </TouchableOpacity>
@@ -441,7 +441,7 @@ export default function HomeScreen() {
         <View style={styles.shiftModalOverlay}>
           <View style={styles.shiftModalCard}>
             <Text style={styles.shiftModalTitle}>
-              {activeShift ? "Manage Shift" : "Where are you working today?"}
+              {activeShift ? t.home.shiftManageTitle : t.home.shiftModalTitle}
             </Text>
 
             {activeShift && (
@@ -457,7 +457,7 @@ export default function HomeScreen() {
                   setShowShiftModal(false);
                 }}
               >
-                <Text style={styles.shiftEndText}>End current shift</Text>
+                <Text style={styles.shiftEndText}>{t.home.shiftEndCurrent}</Text>
               </TouchableOpacity>
             )}
 
@@ -474,7 +474,7 @@ export default function HomeScreen() {
                 setShowShiftModal(false);
               }}
             >
-              <Text style={styles.shiftOptionText}>Personal / Independent</Text>
+              <Text style={styles.shiftOptionText}>{t.home.shiftPersonal}</Text>
             </TouchableOpacity>
 
             {businessLinks.map((link) => (
@@ -496,7 +496,7 @@ export default function HomeScreen() {
                   setShowShiftModal(false);
                 }}
               >
-                <Text style={styles.shiftOptionText}>{link.businesses?.name ?? "Business"}</Text>
+                <Text style={styles.shiftOptionText}>{link.businesses?.name ?? t.home.shiftBusiness}</Text>
               </TouchableOpacity>
             ))}
 
@@ -507,14 +507,14 @@ export default function HomeScreen() {
                 router.push("/(tabs)/settings");
               }}
             >
-              <Text style={styles.shiftAddBusinessText}>+ Link a workplace</Text>
+              <Text style={styles.shiftAddBusinessText}>{t.home.shiftLinkWorkplace}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.shiftModalCancel}
               onPress={() => setShowShiftModal(false)}
             >
-              <Text style={styles.shiftModalCancelText}>Cancel</Text>
+              <Text style={styles.shiftModalCancelText}>{t.home.shiftCancel}</Text>
             </TouchableOpacity>
           </View>
         </View>
