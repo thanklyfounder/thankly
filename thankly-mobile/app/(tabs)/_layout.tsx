@@ -40,9 +40,9 @@ export default function TabLayout() {
         tabBarActiveTintColor: "#0284c7",
         tabBarInactiveTintColor: "#94a3b8",
         tabBarStyle: {
-          height: isAndroid? undefined : 70,
+          height: isAndroid? 90 : 70,
           paddingTop: 4,
-          paddingBottom: 24,
+          paddingBottom: isAndroid? 44 : 24,
           backgroundColor: "#ffffff",
           borderTopWidth: 1,
           borderTopColor: "#e2e8f0",
@@ -126,6 +126,14 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="link-workplace"
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+      
       <Tabs.Screen
         name="notification-preferences"
         options={{

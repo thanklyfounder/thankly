@@ -756,9 +756,9 @@ rangeGrid: {
   },
 
   rangeMetricValue: {
-    marginTop: 8,
+    marginTop: isAndroid? 6 : 8,
     color: "#0f172a",
-    fontSize: 22,
+    fontSize: isAndroid? 18 : 22,
     fontWeight: "800",
     paddingHorizontal: isAndroid? 4 : 6,
   },

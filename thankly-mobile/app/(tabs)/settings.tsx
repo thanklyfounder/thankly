@@ -197,6 +197,12 @@ export default function SettingsScreen() {
           />
 
           <SettingsRow
+            icon="🏢"
+            title={t.settings.linkWorkplace}
+            subtitle={t.settings.linkWorkplaceSubtitle}
+            onPress={() => router.push("/(tabs)/link-workplace")}
+          />
+          <SettingsRow
             icon="🔔"
             title={t.settings.notifications}
             subtitle={t.settings.notificationsSubtitle}

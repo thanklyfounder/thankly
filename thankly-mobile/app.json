@@ -4,7 +4,7 @@
     "slug": "thankly-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icons/app-icon.png",
+    "icon": "./assets/icons/app-icon-true.png",
     "splash": {
       "image": "./assets/splash/thankly-splash.png",
       "resizeMode": "contain",
@@ -21,16 +21,16 @@
       "package": "com.thankly.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/icons/app-icon.png",
-        "backgroundImage": "./assets/icons/app-icon.png",
-        "monochromeImage": "./assets/icons/app-icon.png"
+        "foregroundImage": "./assets/icons/app-icon-true.png",
+        "backgroundImage": "./assets/icons/app-icon-true.png",
+        "monochromeImage": "./assets/icons/app-icon-true.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/icons/app-icon.png"
+      "favicon": "./assets/icons/app-icon-true.png"
     },
     "plugins": [
       "expo-router",
@@ -50,6 +50,12 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow Thankly to use Face ID to protect your account."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Thankly uses your camera to scan business invite QR codes."
         }
       ],
       "expo-web-browser",
