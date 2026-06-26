@@ -283,7 +283,7 @@ export default function FinancialPreferencesScreen() {
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => router.back()}
+            onPress={() => router.push("/(tabs)/settings")}
           >
             <Text style={styles.secondaryText}>{t.financialpreferences.backToSettings}</Text>
           </TouchableOpacity>

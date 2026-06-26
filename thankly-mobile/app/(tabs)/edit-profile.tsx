@@ -327,12 +327,12 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 120 },
 
   changePhotoButton: {
-    marginTop: -18,
+    marginTop: -10,
     marginBottom: 18,
     alignSelf: "center",
     backgroundColor: "white",
     borderRadius: 999,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 18,
   },
 
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    marginTop: -5,
+    marginTop: -12,
     backgroundColor: "white",
     borderRadius: 28,
     padding: 5,
