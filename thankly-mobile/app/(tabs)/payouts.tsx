@@ -23,7 +23,7 @@ import {
   getWorkerTransactions,
 } from "@/services/workerService";
 
-const API_BASE_URL = "http://192.168.1.125:3000";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://getthankly.com";
 const isAndroid = Platform.OS === "android";
 
 type PayoutMethod = "standard" | "instant";

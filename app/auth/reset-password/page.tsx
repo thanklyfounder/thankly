@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
       <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
         <div className="w-full max-w-sm rounded-3xl bg-white shadow-xl p-8 text-center">
           <div className="w-16 h-16 rounded-2xl mx-auto mb-4" style={{background: "linear-gradient(135deg, #1b5a96, #0f3f73)"}} />
-          <p className="text-slate-500 text-sm">Verifying your reset link...</p>
+          <p className="text-slate-700 text-sm">Verifying your reset link...</p>
         </div>
       </main>
     );
@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
         </div>
         <div className="p-8">
           <h2 className="text-xl font-bold text-slate-900 mb-1">Set new password</h2>
-          <p className="text-slate-500 text-sm mb-6">Choose a strong password for your Thankly account.</p>
+          <p className="text-slate-700 text-sm mb-6">Choose a strong password for your Thankly account.</p>
 
           <input
             type="password"

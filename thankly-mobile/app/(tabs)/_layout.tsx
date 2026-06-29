@@ -40,9 +40,9 @@ export default function TabLayout() {
         tabBarActiveTintColor: "#0284c7",
         tabBarInactiveTintColor: "#94a3b8",
         tabBarStyle: {
-          height: isAndroid? 90 : 70,
+          height: isAndroid? 110 : 70,
           paddingTop: 4,
-          paddingBottom: isAndroid? 44 : 24,
+          paddingBottom: isAndroid? 60 : 24,
           backgroundColor: "#ffffff",
           borderTopWidth: 1,
           borderTopColor: "#e2e8f0",
@@ -133,7 +133,7 @@ export default function TabLayout() {
           tabBarItemStyle: { display: "none" },
         }}
       />
-      
+
       <Tabs.Screen
         name="notification-preferences"
         options={{

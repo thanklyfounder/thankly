@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "thankly-mobile",
+    "name": "Thankly",
     "slug": "thankly-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,10 +15,13 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.thankly.app"
+      "bundleIdentifier": "com.getthankly.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.thankly.app",
+      "package": "com.getthankly.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/icons/app-icon-true.png",
@@ -26,7 +29,13 @@
         "monochromeImage": "./assets/icons/app-icon-true.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -60,11 +69,18 @@
       ],
       "expo-web-browser",
       "@react-native-community/datetimepicker",
-      "expo-asset"
+      "expo-asset",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "54e5c44d-321b-4ce6-8315-c7130e7790b6"
+      }
     }
   }
 }

@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getCurrentWorker } from "@/services/workerService";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const API_BASE_URL = "http://192.168.1.125:3000";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://getthankly.com";
 const isAndroid = Platform.OS === "android";
 type Worker = {
   id: string;

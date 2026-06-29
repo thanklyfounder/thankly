@@ -66,7 +66,7 @@ export default function SecurityScreen() {
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: "thanklymobile://reset-password",
+      redirectTo: "https://getthankly.com/auth/reset-password",
     });
 
     if (error) {
