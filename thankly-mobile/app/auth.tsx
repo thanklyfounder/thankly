@@ -103,6 +103,7 @@ export default function AuthScreen() {
       password: signupPassword,
       options: {
         data: { full_name: fullName.trim() },
+        emailRedirectTo: "https://getthankly.com/auth/confirm",
       },
     });
 

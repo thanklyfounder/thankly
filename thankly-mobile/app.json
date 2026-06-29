@@ -8,7 +8,7 @@
     "splash": {
       "image": "./assets/splash/thankly-splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B3D91"
+      "backgroundColor": "#0A2F6E"
     },
     "scheme": "thanklymobile",
     "userInterfaceStyle": "automatic",
@@ -49,7 +49,7 @@
           "image": "./assets/splash/thankly-splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0B3D91",
+          "backgroundColor": "#0A2F6E",
           "dark": {
             "backgroundColor": "#000000"
           }
