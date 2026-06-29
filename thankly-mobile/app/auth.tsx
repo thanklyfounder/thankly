@@ -266,7 +266,7 @@ export default function AuthScreen() {
             {step === "verify_email" && (
               <>
                 <Text style={styles.title}>Check your email</Text>
-                <Text style={styles.subtitle}>We sent a confirmation link to {signupEmail}. Tap it to activate your account.</Text>
+                <Text style={styles.subtitle}>We sent a confirmation link to {signupEmail}. Tap it to activate your account. If you don't see it, check your spam or junk folder.</Text>
 
                 <View style={styles.emailIconContainer}>
                   <Text style={styles.emailIcon}>📬</Text>
