@@ -109,7 +109,10 @@ export default function AuthScreen() {
 
     if (error) {
       setLoading(false);
-      Alert.alert("Unable to create account", error.message);
+      const message = error.message.toLowerCase().includes("already")
+        ? "An account with this email already exists. Try signing in instead."
+        : error.message;
+      Alert.alert("Unable to create account", message);
       return;
     }
 
@@ -234,6 +237,7 @@ export default function AuthScreen() {
 
                 <TextInput value={fullName} onChangeText={setFullName} placeholder="Full name" placeholderTextColor="#94a3b8" autoCapitalize="words" style={styles.input} />
                 <TextInput value={phone} onChangeText={setPhone} placeholder="Phone number (e.g. 4075551234)" placeholderTextColor="#94a3b8" keyboardType="phone-pad" style={styles.input} />
+                <Text style={styles.legalNote}>By continuing, you consent to receive a verification SMS. Standard message and data rates may apply.</Text>
 
                 <TouchableOpacity style={styles.button} onPress={createAccount} disabled={loading}>
                   <Text style={styles.buttonText}>{loading ? "Creating account..." : "Create account"}</Text>
@@ -258,7 +262,7 @@ export default function AuthScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep("verify_email")}>
-                  <Text style={styles.secondaryButtonText}>Skip for now</Text>
+                  <Text style={styles.secondaryButtonText}>Use email instead</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -411,5 +415,13 @@ const styles = StyleSheet.create({
   eyeButton: {
     paddingLeft: 8,
     paddingVertical: 12,
+  },
+  legalNote: {
+    marginTop: 8,
+    color: "#94a3b8",
+    fontSize: 11,
+    textAlign: "center",
+    lineHeight: 16,
+    paddingHorizontal: 4,
   },
 });
