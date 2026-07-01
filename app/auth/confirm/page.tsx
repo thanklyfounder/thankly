@@ -8,9 +8,7 @@ function ConfirmContent() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
 
-  const webHref = next === "business"
-    ? "/business/create"
-    : "/create";
+  const webHref = "/auth";
 
   return (
     <>

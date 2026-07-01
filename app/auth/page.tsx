@@ -107,7 +107,7 @@ export default function AuthPage() {
       .single();
 
     if (worker?.profile_slug) {
-      router.push(`/manage/${worker.profile_slug}`);
+      router.push("/manage");
     } else {
       router.push("/create");
     }
