@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 
 type Language = "en" | "es";
 
@@ -132,6 +133,8 @@ export default function CreatePage() {
   }
 
   return (
+    <>
+    <AppNav variant="app" />
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
         <div className="bg-gradient-to-b from-sky-700 to-sky-900 px-6 py-6 text-center">
@@ -222,5 +225,6 @@ export default function CreatePage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

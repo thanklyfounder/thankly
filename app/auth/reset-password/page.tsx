@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import AppNav from "@/components/AppNav";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -56,6 +57,8 @@ export default function ResetPasswordPage() {
   }
 
   return (
+    <>
+    <AppNav variant="public" backLabel="← Back to home" backHref="/" />
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-3xl bg-white shadow-xl overflow-hidden">
         <div className="p-8 text-center" style={{background: "linear-gradient(135deg, #1b5a96, #0f3f73)"}}>
@@ -96,5 +99,6 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </main>
+    </>
   );
 }

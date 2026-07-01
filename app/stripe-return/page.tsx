@@ -1,5 +1,6 @@
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
+import AppNav from "@/components/AppNav";
 
 export default async function StripeReturnPage({
   searchParams,
@@ -47,9 +48,12 @@ export default async function StripeReturnPage({
   }
 
   return (
+    <>
+    <AppNav variant="app" />
     <main style={{ padding: 32, fontFamily: "system-ui" }}>
       <h1>Stripe setup complete</h1>
       <p>You can now return to the Thankly app.</p>
     </main>
+    </>
   );
 }
