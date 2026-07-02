@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 
 type Language = "en" | "es";
 type Step = "name" | "account";
@@ -141,13 +142,18 @@ export default function CreateBusinessPage() {
 
   if (authChecking) {
     return (
+      <>
+      <AppNav variant="app" />
       <main className="min-h-screen bg-slate-100 flex items-center justify-center">
         <p className="text-slate-500 text-sm">Loading...</p>
       </main>
+      </>
     );
   }
 
   return (
+    <>
+    <AppNav variant="app" />
     <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
 
@@ -259,5 +265,6 @@ export default function CreateBusinessPage() {
         )}
       </div>
     </main>
+    </>
   );
 }

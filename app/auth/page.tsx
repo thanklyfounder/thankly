@@ -122,14 +122,14 @@ export default function AuthPage() {
   return (
     <>
     <AppNav variant="public" backLabel="← Back to home" backHref="/" />
-    <main className="min-h-screen bg-slate-100 flex flex-col items-center justify-center px-4 py-12">
+    <main className="min-h-screen bg-slate-100 flex flex-col items-center justify-center px-3 sm:px-6 pt-4 pb-8">
       <div className="w-full max-w-sm">
 
         {/* Logo */}
         <div className="text-center mb-8">
           <img src="/images/app-icon-true.png" alt="Thankly" className="w-20 h-20 rounded-2xl mb-4 object-contain mx-auto" />
-          <h1 className="text-2xl font-black text-[#0F2347]">Thankly</h1>
-          <p className="text-sm text-[#0F2347]/70 mt-1">Your Tips. Your Money.</p>
+          <h1 className="text-2xl font-black text-[#0A1F44]">Thankly</h1>
+          <p className="text-sm text-[#0A1F44]/70 mt-1">Your Tips. Your Money.</p>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl shadow-slate-900/10 p-6">
@@ -306,8 +306,8 @@ export default function AuthPage() {
 
         </div>
 
-        {/* Download the app */}
-        <div className="mt-8 text-center">
+        {/* Download the app — inside card so visible without scrolling */}
+        <div className="mt-5 pt-4 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-400 mb-3">Prefer the app? Download Thankly for free.</p>
           <div className="flex items-center justify-center gap-3">
             <a href="https://apps.apple.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-black text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">

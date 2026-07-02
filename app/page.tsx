@@ -467,8 +467,7 @@ export default function HomePage() {
               {[
                 { href: '/privacy', label: 'Privacy' },
                 { href: '/terms', label: 'Terms' },
-                { href: '/earnings-disclaimer', label: 'Earnings Disclaimer' },
-                { href: '/tax-disclaimer', label: 'Tax Disclaimer' },
+                { href: '/disclosures', label: 'Disclosures' },
               ].map((link) => (
                 <Link key={link.href} href={link.href} className="text-white/40 text-xs hover:text-white/80 transition-colors">
                   {link.label}
