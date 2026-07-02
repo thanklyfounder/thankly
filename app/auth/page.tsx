@@ -127,9 +127,9 @@ export default function AuthPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/images/app-icon-true.png" alt="Thankly" className="w-20 h-20 rounded-2xl mb-4 object-contain" />
-          <h1 className="text-2xl font-black text-slate-900">Thankly</h1>
-          <p className="text-sm text-slate-500 mt-1">Your Tips. Your Money.</p>
+          <img src="/images/app-icon-true.png" alt="Thankly" className="w-20 h-20 rounded-2xl mb-4 object-contain mx-auto" />
+          <h1 className="text-2xl font-black text-[#0F2347]">Thankly</h1>
+          <p className="text-sm text-[#0F2347]/70 mt-1">Your Tips. Your Money.</p>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl shadow-slate-900/10 p-6">

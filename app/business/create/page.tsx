@@ -248,7 +248,7 @@ export default function CreateBusinessPage() {
               <span>{t.alreadyHaveAccount}</span>
               <button
                 type="button"
-                onClick={handleSignInAndBusiness}
+                onClick={() => window.location.href = "/auth"}
                 disabled={loading}
                 className="font-semibold text-sky-600 hover:underline disabled:opacity-60"
               >
