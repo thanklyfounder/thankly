@@ -70,6 +70,11 @@ export default function CreatePage() {
         data: { user },
       } = await supabase.auth.getUser();
 
+      if (!user) {
+        window.location.href = "/auth";
+        return;
+      }
+
       if (user?.email) {
         setUserEmail(user.email);
 
