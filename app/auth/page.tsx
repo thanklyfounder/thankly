@@ -127,9 +127,7 @@ export default function AuthPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#0f3f73] mb-4">
-            <img src="/images/app-icon-true.png" alt="Thankly" className="w-12 h-12 object-contain" />
-          </div>
+          <img src="/images/app-icon-true.png" alt="Thankly" className="w-20 h-20 rounded-2xl mb-4 object-contain" />
           <h1 className="text-2xl font-black text-slate-900">Thankly</h1>
           <p className="text-sm text-slate-500 mt-1">Your Tips. Your Money.</p>
         </div>
