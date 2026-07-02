@@ -6,6 +6,7 @@ import EditWorkerProfile from "@/components/EditWorkerProfile";
 import ResumeStripeButton from "@/components/ResumeStripeButton";
 import TaxWithholdingCard from "@/components/TaxWithholdingCard";
 import ExportEarningsButton from "@/components/ExportEarningsButton";
+import AppNav from "@/components/AppNav";
 
 type Filter = "today" | "week" | "month" | "all" | "custom";
 type Language = "en" | "es";
@@ -318,6 +319,8 @@ export default function ManageDashboardClient({
   ];
 
   return (
+    <>
+    <AppNav variant="public" />
     <main className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
@@ -487,7 +490,7 @@ export default function ManageDashboardClient({
           language={language}
         />
 
-        <ShareQrCard publicUrl={publicUrl} language={language} />
+        <ShareQrCard publicUrl={publicUrl} workerName={worker.full_name} language={language} />
 
         <EditWorkerProfile
           workerId={worker.id}
@@ -584,5 +587,6 @@ export default function ManageDashboardClient({
         </section>
       </div>
     </main>
+    </>
   );
 }

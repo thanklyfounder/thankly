@@ -8,11 +8,13 @@ type Language = "en" | "es";
 
 type ShareQrCardProps = {
   publicUrl: string;
+  workerName?: string;
   language?: Language;
 };
 
 export default function ShareQrCard({
   publicUrl,
+  workerName = "Thankly Worker",
   language = "en",
 }: ShareQrCardProps) {
   const qrRef = useRef<HTMLDivElement>(null);
@@ -25,7 +27,7 @@ export default function ShareQrCard({
         ? "Copy your link, open your page, or download your QR code."
         : "Copia tu enlace, abre tu página o descarga tu código QR.",
     publicLink: language === "en" ? "Public Link" : "Enlace público",
-    openPage: language === "en" ? "Open page" : "Abrir página",
+    openPage: language === "en" ? "View Tip Page" : "Ver página de propinas",
     downloadQr: language === "en" ? "Download QR" : "Descargar QR",
     share: language === "en" ? "Share" : "Compartir",
     copied: language === "en" ? "Copied!" : "¡Copiado!",
@@ -67,13 +69,30 @@ export default function ShareQrCard({
   }
 
   async function shareLink() {
-    if (navigator.share) {
-      await navigator.share({
-        title: t.shareTitle,
-        text: t.shareText,
-        url: publicUrl,
-      });
-    } else {
+    try {
+      const card = qrRef.current;
+      if (!card) return;
+
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(card, { backgroundColor: "#0f3f73", scale: 2 });
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        if (navigator.share && navigator.canShare?.({ files: [new File([blob], "thankly-qr.png", { type: "image/png" })] })) {
+          await navigator.share({
+            title: t.shareTitle,
+            text: t.shareText,
+            files: [new File([blob], "thankly-qr.png", { type: "image/png" })],
+          });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "thankly-qr.png";
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      }, "image/png");
+    } catch {
       await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -133,9 +152,16 @@ export default function ShareQrCard({
         <div className="flex justify-center">
           <div
             ref={qrRef}
-            className="rounded-2xl border border-slate-200 bg-white p-4"
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "#0f3f73", padding: "24px", textAlign: "center", width: "220px" }}
           >
-            <QRCode value={publicUrl} size={180} />
+            <p style={{ color: "#ffffff", fontWeight: 900, fontSize: "18px", margin: "0 0 4px", letterSpacing: "0.5px" }}>Thankly</p>
+            <p style={{ color: "#bfdbfe", fontSize: "11px", margin: "0 0 14px" }}>Worker Finance Platform</p>
+            <div style={{ background: "#ffffff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
+              <QRCode value={publicUrl} size={160} />
+            </div>
+            <p style={{ color: "#ffffff", fontSize: "12px", fontWeight: 700, margin: "12px 0 2px" }}>{workerName}</p>
+            <p style={{ color: "#93c5fd", fontSize: "10px", margin: "0" }}>getthankly.com</p>
           </div>
         </div>
       </div>
