@@ -1,12 +1,20 @@
+import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase-server";
 import ManageDashboardClient from "@/components/ManageDashboardClient";
 
 export default async function ManagePage() {
   const supabase = await createServerClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth");
+  }
+
   const { data: workers, error: workerError } = await supabase
     .from("workers")
     .select("*")
+    .eq("auth_user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1);
 

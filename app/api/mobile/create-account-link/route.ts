@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
           email,
           full_name: fullName,
           profile_slug: generatedSlug,
-          bio: "Thank you for joining",
+          bio: null,
           stripe_onboarded: false,
         })
         .select("*")
