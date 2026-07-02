@@ -16,6 +16,8 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [workerInfo, setWorkerInfo] = useState(false);
+  const [businessInfo, setBusinessInfo] = useState(false);
 
   // Worker signup
   const [fullName, setFullName] = useState("");
@@ -113,7 +115,7 @@ export default function AuthPage() {
     }
   }
 
-  const inputClass = "w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0f3f73]";
+  const inputClass = "w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0f3f73]";
   const btnPrimary = "w-full rounded-2xl bg-[#0f3f73] py-3 text-white font-semibold text-sm hover:bg-[#0a2f5e] transition disabled:opacity-60";
   const btnSecondary = "w-full rounded-2xl border border-slate-200 py-3 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition";
 
@@ -126,7 +128,7 @@ export default function AuthPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#0f3f73] mb-4">
-            <img src="/images/app-iconfade.png" alt="Thankly" className="w-12 h-12 object-contain" />
+            <img src="/images/app-icon-true.png" alt="Thankly" className="w-12 h-12 object-contain" />
           </div>
           <h1 className="text-2xl font-black text-slate-900">Thankly</h1>
           <p className="text-sm text-slate-500 mt-1">Your Tips. Your Money.</p>
@@ -138,26 +140,48 @@ export default function AuthPage() {
           {view === "select" && (
             <>
               <h2 className="text-lg font-bold text-slate-900 text-center mb-1">Get started</h2>
-              <p className="text-sm text-slate-500 text-center mb-6">Choose your account type to continue.</p>
+              <p className="text-sm text-slate-500 text-center mb-6">Choose the account you want to create</p>
 
               <div className="grid grid-cols-2 gap-3 mb-6">
-                <button
-                  onClick={() => { setError(""); setView("worker_signup"); }}
-                  className="flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
-                >
-                  <span className="text-3xl">👤</span>
-                  <span className="font-bold text-slate-900 text-sm">Worker</span>
-                  <span className="text-xs text-slate-500 text-center leading-tight">I receive tips</span>
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => { setError(""); setView("worker_signup"); }}
+                    className="w-full flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
+                  >
+                    <span className="text-3xl">👤</span>
+                    <span className="font-bold text-slate-900 text-sm">Worker</span>
+                    <span className="text-xs text-slate-500 text-center leading-tight">I receive tips</span>
+                  </button>
+                  <button
+                    onClick={() => setWorkerInfo(w => !w)}
+                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs font-bold hover:bg-slate-200 flex items-center justify-center"
+                  >i</button>
+                  {workerInfo && (
+                    <div className="absolute z-10 top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl text-xs text-slate-600 leading-relaxed">
+                      A Worker account is for individuals who receive tips. You'll get a personal QR code, earnings dashboard, payouts to your bank, and a built-in Tax Pocket to set aside funds for tax season.
+                    </div>
+                  )}
+                </div>
 
-                <button
-                  onClick={() => { setError(""); setView("business_signup"); }}
-                  className="flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
-                >
-                  <span className="text-3xl">🏢</span>
-                  <span className="font-bold text-slate-900 text-sm">Business</span>
-                  <span className="text-xs text-slate-500 text-center leading-tight">I manage a team</span>
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => { setError(""); setView("business_signup"); }}
+                    className="w-full flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
+                  >
+                    <span className="text-3xl">🏢</span>
+                    <span className="font-bold text-slate-900 text-sm">Business</span>
+                    <span className="text-xs text-slate-500 text-center leading-tight">I manage a team</span>
+                  </button>
+                  <button
+                    onClick={() => setBusinessInfo(b => !b)}
+                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs font-bold hover:bg-slate-200 flex items-center justify-center"
+                  >i</button>
+                  {businessInfo && (
+                    <div className="absolute z-10 top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl text-xs text-slate-600 leading-relaxed">
+                      A Business account is for managers and owners who oversee a team of tipped workers. You'll get a team dashboard, combined earnings reports, and worker QR code management.
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="relative flex items-center mb-5">
@@ -175,7 +199,7 @@ export default function AuthPage() {
           {/* ── WORKER SIGNUP ── */}
           {view === "worker_signup" && (
             <>
-              <button onClick={() => { setError(""); setView("select"); }} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
                 ← Back
               </button>
               <h2 className="text-lg font-bold text-slate-900 mb-1">Worker Account</h2>
@@ -195,6 +219,10 @@ export default function AuthPage() {
                 {loading ? "Creating account..." : "Create Worker Account"}
               </button>
 
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Secure registration — your data is encrypted
+              </p>
               <button onClick={() => { setError(""); setView("signin"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
                 Already have an account? Sign in
               </button>
@@ -204,7 +232,7 @@ export default function AuthPage() {
           {/* ── BUSINESS SIGNUP ── */}
           {view === "business_signup" && (
             <>
-              <button onClick={() => { setError(""); setView("select"); }} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
                 ← Back
               </button>
               <h2 className="text-lg font-bold text-slate-900 mb-1">Business Account</h2>
@@ -223,6 +251,10 @@ export default function AuthPage() {
                 {loading ? "Creating account..." : "Create Business Account"}
               </button>
 
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Secure registration — your data is encrypted
+              </p>
               <button onClick={() => { setError(""); setView("signin"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
                 Already have an account? Sign in
               </button>
@@ -232,7 +264,7 @@ export default function AuthPage() {
           {/* ── SIGN IN ── */}
           {view === "signin" && (
             <>
-              <button onClick={() => { setError(""); setView("select"); }} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
                 ← Back
               </button>
               <h2 className="text-lg font-bold text-slate-900 mb-1">Welcome back</h2>
