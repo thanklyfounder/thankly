@@ -125,13 +125,13 @@ export default function AuthPage() {
     <main className="min-h-screen bg-slate-100 flex flex-col items-center justify-center px-3 sm:px-6 pt-4 pb-8">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <img src="/images/app-icon-true.png" alt="Thankly" className="w-20 h-20 rounded-2xl mb-4 object-contain mx-auto" />
-          <h1 className="text-2xl font-black text-[#0A1F44]">Thankly</h1>
-          <p className="text-sm text-[#0A1F44]/70 mt-1">Your Tips. Your Money.</p>
+        <div className="text-center mb-3 flex flex-col items-center">
+          <img src="/images/app-icon-true.png" alt="Thankly" className="w-16 h-16 rounded-2xl mb-2 object-contain" />
+          <h1 className="text-xl font-black text-[#0A1F44]">Thankly</h1>
+          <p className="text-sm text-[#0A1F44]/75 mt-0.5">Your Tips. Your Money.</p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-900/10 p-6">
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-900/10 p-4">
 
           {/* ── ROLE SELECTOR ── */}
           {view === "select" && (
