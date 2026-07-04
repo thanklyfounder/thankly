@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
 
 type View = "select" | "worker_signup" | "business_signup" | "signin" | "check_email";
 
-export default function AuthPage() {
+import { Suspense } from "react";
+
+function AuthContent() {
   const router = useRouter();
   const [view, setView] = useState<View>("select");
 
+  useEffect(() => {
+    const intent = sessionStorage.getItem("authView");
+    if (intent === "signin") {
+      setView("signin");
+      sessionStorage.removeItem("authView");
+    }
+  }, []);
   // Shared
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -321,5 +330,13 @@ export default function AuthPage() {
       </div>    
     </main>
     </>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense>
+      <AuthContent />
+    </Suspense>
   );
 }

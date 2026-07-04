@@ -40,14 +40,14 @@ export default function HomePage() {
           <Image src="/images/thanklyappicon.png" alt="Thankly" width={36} height={36} className="rounded-lg" />
           Thankly
         </Link>
-        <ul className="hidden md:flex items-center gap-8 list-none">
+        <ul className="flex items-center gap-4 md:gap-8 list-none">
           {[
             { href: '#how-it-works', label: 'How it works' },
             { href: '#features', label: 'Features' },
             { href: '#founding', label: 'Founding 500' },
             { href: '#business', label: 'For Business' },
           ].map((link) => (
-            <li key={link.href}>
+            <li key={link.href} className="hidden md:block">
               <a href={link.href} className="text-white/80 text-sm font-medium hover:text-white transition-colors">
                 {link.label}
               </a>
@@ -55,7 +55,7 @@ export default function HomePage() {
           ))}
           <li>
             <a
-              href="/auth?view=signin"
+              href="/auth/signin"
               className="text-white/80 text-sm font-medium hover:text-white transition-colors"
             >
               Sign in
@@ -406,7 +406,7 @@ export default function HomePage() {
             <a href="/auth" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
               Get started free
             </a>
-            <a href="/auth?view=signin" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
+            <a href="/auth/signin" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
               Sign in
             </a>
           </div>
