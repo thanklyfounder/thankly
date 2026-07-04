@@ -55,6 +55,14 @@ export default function HomePage() {
           ))}
           <li>
             <a
+              href="/auth?view=signin"
+              className="text-white/80 text-sm font-medium hover:text-white transition-colors"
+            >
+              Sign in
+            </a>
+          </li>
+          <li>
+            <a
               href="/auth"
               className="bg-[#00B4D8] text-[#0F2347] font-bold text-sm px-5 py-2 rounded-full hover:bg-[#90E0EF] transition-colors"
             >
@@ -398,8 +406,8 @@ export default function HomePage() {
             <a href="/auth" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
               Get started free
             </a>
-            <a href="#how-it-works" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
-              Learn more
+            <a href="/auth?view=signin" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
+              Sign in
             </a>
           </div>
         </div>
