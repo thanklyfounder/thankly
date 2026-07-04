@@ -66,7 +66,7 @@ export default function HomePage() {
               href="/auth"
               className="bg-[#00B4D8] text-[#0F2347] font-bold text-sm px-5 py-2 rounded-full hover:bg-[#90E0EF] transition-colors"
             >
-              Join Free
+              Sign up
             </a>
           </li>
         </ul>
