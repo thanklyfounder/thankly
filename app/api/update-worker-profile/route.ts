@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
     const workerId = body?.workerId;
     const fullName = body?.fullName?.trim();
     const bio = body?.bio?.trim();
+    const bioEs = body?.bioEs?.trim();
 
     if (!workerId || !fullName) {
       return NextResponse.json(
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
       .update({
         full_name: fullName,
         bio: bio || null,
+        bio_es: bioEs || null,
       })
       .eq("id", workerId);
 

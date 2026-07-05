@@ -35,6 +35,8 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
 
   const workerName = session.metadata?.worker_name || "your server";
   const tipAmount = Number(session.metadata?.tip_amount ?? 0);
+  const workerReceives = Number(session.metadata?.worker_receives ?? 0);
+  const customerCoveredFee = session.metadata?.customer_covered_fee === "true";
   const avatarUrl = session.metadata?.avatar_url ?? null;
   const workerInitial = workerName.charAt(0).toUpperCase();
 
@@ -63,9 +65,17 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
         </h1>
 
         <p className="mt-8 text-center text-2xl font-bold leading-relaxed text-blue-100">
-          They received your full {formatDollars(tipAmount)}.
-          <br />
-          Zero fees deducted.
+          {customerCoveredFee ? (
+            <>
+              They received your full {formatDollars(tipAmount)}.
+              <br />
+              Zero fees deducted.
+            </>
+          ) : (
+            <>
+              They received {formatDollars(workerReceives)} from your {formatDollars(tipAmount)} tip.
+            </>
+          )}
         </p>
 
         <div className="my-10 h-1 w-20 rounded-full bg-white/20" />

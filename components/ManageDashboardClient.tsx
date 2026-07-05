@@ -16,6 +16,7 @@ type Worker = {
   full_name: string;
   email: string;
   bio: string | null;
+  bio_es: string | null;
   profile_slug: string;
   stripe_onboarded: boolean;
   stripe_account_id: string | null;
@@ -320,7 +321,12 @@ export default function ManageDashboardClient({
 
   return (
     <>
-    <AppNav variant="public" />
+    <AppNav variant="app" />
+    <div className="bg-[#00B4D8]/15 border-b border-[#00B4D8]/30 px-[5%] py-3 flex items-center justify-between gap-4">
+      <p className="text-sm text-[#0F2347] font-medium">
+        🎉 You're in early! The Thankly app is coming soon to the App Store and Google Play. Manage your account here in the meantime.
+      </p>
+    </div>
     <main className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
@@ -496,6 +502,7 @@ export default function ManageDashboardClient({
           workerId={worker.id}
           initialName={worker.full_name}
           initialBio={worker.bio}
+          initialBioEs={worker.bio_es}
           language={language}
         />
 

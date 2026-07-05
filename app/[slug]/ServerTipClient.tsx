@@ -176,7 +176,7 @@ export default function ServerTipClient({
       );
 
       stripeFee = Math.round(totalCharge * stripeRate) + fixedFee;
-      thanklyFee = totalCharge - stripeFee - amountInCents;
+      thanklyFee = Math.round(totalCharge * thanklyRate);
       workerReceives = amountInCents;
     } else {
       totalCharge = amountInCents;
