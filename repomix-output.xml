@@ -65,6 +65,7 @@ app/api/update-worker-profile/route.ts
 app/auth/confirm/page.tsx
 app/auth/page.tsx
 app/auth/reset-password/page.tsx
+app/auth/signin/page.tsx
 app/business/[slug]/join/page.tsx
 app/business/[slug]/page.tsx
 app/business/create/page.tsx
@@ -298,566 +299,6 @@ export default async function ServerPage({ params, searchParams }: PageProps) {
       success={resolvedSearchParams.success === "true"}
       canceled={resolvedSearchParams.canceled === "true"}
     />
-  );
-}
-</file>
-
-<file path="app/[slug]/ServerTipClient.tsx">
-"use client";
-
-import { useMemo, useState } from "react";
-
-type TipAmount = "preset1" | "preset2" | "preset3" | "custom";
-type CustomMode = "amount" | "calculator";
-type Language = "en" | "es";
-
-type ServerTipClientProps = {
-  displayName: string;
-  bio?: string | null;
-  pageUrl: string;
-  avatarUrl?: string | null;
-  tipAmount1?: number | null;
-  tipAmount2?: number | null;
-  tipAmount3?: number | null;
-  success?: boolean;
-  canceled?: boolean;
-};
-
-type ParticleData = {
-  top: string;
-  left: string;
-  delay: string;
-  duration: string;
-};
-
-function seededRandom(seed: number) {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
-
-function fixedPercent(value: number) {
-  return `${value.toFixed(3)}%`;
-}
-
-function fixedSeconds(value: number) {
-  return `${value.toFixed(3)}s`;
-}
-
-function buildParticles(count: number, seedOffset: number): ParticleData[] {
-  return Array.from({ length: count }, (_, i) => {
-    const seed = i + seedOffset;
-
-    const top = 8 + seededRandom(seed * 1.37) * 40;
-    const left = 4 + seededRandom(seed * 2.11) * 92;
-    const delay = seededRandom(seed * 3.73) * 8;
-    const duration = 1.4 + seededRandom(seed * 4.91) * 1.4;
-
-    return {
-      top: fixedPercent(top),
-      left: fixedPercent(left),
-      delay: fixedSeconds(delay),
-      duration: fixedSeconds(duration),
-    };
-  });
-}
-
-function formatMoney(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-export default function ServerTipClient({
-  displayName,
-  bio,
-  pageUrl,
-  avatarUrl,
-  tipAmount1,
-  tipAmount2,
-  tipAmount3,
-  success,
-  canceled,
-
-}: ServerTipClientProps) {
-  const [language, setLanguage] = useState<Language>("en");
-  const [selectedAmount, setSelectedAmount] = useState<TipAmount>("preset2");
-  const [coverFee, setCoverFee] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const preset1 = tipAmount1 ?? 500;
-  const preset2 = tipAmount2 ?? 1000;
-  const preset3 = tipAmount3 ?? 1500;
-  const [customMode, setCustomMode] = useState<CustomMode>("amount");
-  const [customAmount, setCustomAmount] = useState("");
-  const [billAmount, setBillAmount] = useState("");
-  const [tipPercent, setTipPercent] = useState("18");
-
-  const t = {
-    headline: language === "en" ? `Thank ${displayName}` : `Agradece a ${displayName}`,
-    fallbackBio: language === "en" ? "Make a day in seconds" : "Muestra tu agradecimiento",
-    successTitle: language === "en" ? "Tip sent successfully 🎉" : "Agradecimiento enviado 🎉",
-    successSubtitle:
-      language === "en"
-        ? `Thank you for supporting ${displayName}`
-        : `Gracias por reconocer a ${displayName}`,
-    canceled: language === "en" ? "Payment canceled" : "Pago cancelado",
-    custom: language === "en" ? "Custom" : "Otro",
-    customTip: language === "en" ? "Custom tip" : "Agradecimiento personalizado",
-    customDescription:
-      language === "en"
-        ? "Enter an amount directly or calculate from the bill."
-        : "Ingresa un monto o calcúlalo según la cuenta.",
-    enterAmount: language === "en" ? "Enter amount" : "Ingresar monto",
-    calculateFromBill: language === "en" ? "Calculate from bill" : "Calcular con cuenta",
-    tipAmount: language === "en" ? "Tip amount" : "Monto",
-    billTotal: language === "en" ? "Bill total" : "Total de la cuenta",
-    tipPercentage: language === "en" ? "Tip percentage" : "Porcentaje",
-    customTipLabel: language === "en" ? "Custom tip" : "Agradecimiento",
-    keepFull:
-      language === "en"
-        ? `Help ${displayName} keep 100% of your tip`
-        : `Haz que ${displayName} reciba el 100% de tu agradecimiento`,
-    feeExplanation:
-      language === "en"
-        ? `This covers payment processing so ${displayName} keeps the full tip.`
-        : `Esto cubre el procesamiento para que ${displayName} reciba todo el monto.`,
-    tip: language === "en" ? "Tip" : "Agradecimiento",
-    processingFee: language === "en" ? "Processing fee" : "Cargo de procesamiento",
-    youPay: language === "en" ? "You pay" : "Tu total",
-    receives: language === "en" ? `${displayName} receives` : `${displayName} recibe`,
-    minimum: language === "en" ? "Minimum tip is $5.00" : "Mínimo: $5.00",
-    processing: language === "en" ? "Processing..." : "Procesando...",
-    continue: language === "en" ? "Continue" : "Continuar",
-    secure: language === "en" ? "Secure checkout with Stripe" : "Pago seguro con Stripe",
-  };
-
-  const slug = useMemo(() => {
-    try {
-      const url = new URL(pageUrl);
-      return url.pathname.replace(/^\/+/, "");
-    } catch {
-      return "";
-    }
-  }, [pageUrl]);
-
-  const customAmountCents = useMemo(() => {
-    const amount = Number(customAmount);
-    if (!amount || amount <= 0) return 0;
-    return Math.round(amount * 100);
-  }, [customAmount]);
-
-  const calculatedTipCents = useMemo(() => {
-    const bill = Number(billAmount);
-    const percent = Number(tipPercent);
-
-    if (!bill || bill <= 0 || !percent || percent <= 0) return 0;
-
-    return Math.round(bill * 100 * (percent / 100));
-  }, [billAmount, tipPercent]);
-
-  const amountInCents = useMemo(() => {
-    if (selectedAmount === "preset1") return preset1;
-    if (selectedAmount === "preset2") return preset2;
-    if (selectedAmount === "preset3") return preset3;
-
-    if (selectedAmount === "custom") {
-      if (customMode === "amount") return customAmountCents;
-      return calculatedTipCents;
-    }
-
-    return preset2;
-  }, [selectedAmount, preset1, preset2, preset3, customMode, customAmountCents, calculatedTipCents]);
-
-  const feeBreakdown = useMemo(() => {
-    const stripeRate = 0.029;
-    const thanklyRate = 0.04;
-    const fixedFee = 30;
-
-    let totalCharge = amountInCents;
-    let stripeFee = 0;
-    let thanklyFee = 0;
-    let workerReceives = 0;
-
-    if (coverFee) {
-      totalCharge = Math.ceil(
-        (amountInCents + fixedFee) / (1 - stripeRate - thanklyRate)
-      );
-
-      stripeFee = Math.round(totalCharge * stripeRate) + fixedFee;
-      thanklyFee = totalCharge - stripeFee - amountInCents;
-      workerReceives = amountInCents;
-    } else {
-      totalCharge = amountInCents;
-
-      stripeFee = Math.round(amountInCents * stripeRate) + fixedFee;
-      thanklyFee = Math.round(amountInCents * thanklyRate);
-      workerReceives = amountInCents - stripeFee - thanklyFee;
-    }
-
-    return {
-      totalCharge,
-      stripeFee,
-      thanklyFee,
-      workerReceives,
-    };
-  }, [amountInCents, coverFee]);
-
-  const farParticles = useMemo(() => buildParticles(80, 100), []);
-  const nearParticles = useMemo(() => buildParticles(50, 500), []);
-
-  async function handleContinue() {
-    if (amountInCents < 500) {
-      alert(t.minimum);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const response = await fetch("/api/create-payment", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: amountInCents,
-          slug,
-          coverFee,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-
-      alert(data.error || "Failed to create payment");
-    } catch (error) {
-      console.error("Payment redirect error:", error);
-      alert("Something went wrong starting payment.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
-        <div className="relative overflow-hidden bg-[linear-gradient(180deg,#08183c_0%,#0c2e6f_42%,#0a63c9_100%)] px-6 pt-3 pb-3 text-center">
-          <div className="pointer-events-none absolute inset-0">
-            {farParticles.map((p, i) => (
-              <span
-                key={`f-${i}`}
-                className="particle"
-                style={{
-                  top: p.top,
-                  left: p.left,
-                  animationDelay: p.delay,
-                  animationDuration: p.duration,
-                }}
-              />
-            ))}
-
-            {nearParticles.map((p, i) => (
-              <span
-                key={`n-${i}`}
-                className="particle-near"
-                style={{
-                  top: p.top,
-                  left: p.left,
-                  animationDelay: p.delay,
-                  animationDuration: p.duration,
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="relative">
-            <div className="mb-3 flex justify-center">
-              <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white backdrop-blur">
-                <button
-                  type="button"
-                  onClick={() => setLanguage("en")}
-                  className={`rounded-full px-3 py-1 ${
-                    language === "en" ? "bg-white text-sky-700" : "text-white/80"
-                  }`}
-                >
-                  English
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLanguage("es")}
-                  className={`rounded-full px-3 py-1 ${
-                    language === "es" ? "bg-white text-sky-700" : "text-white/80"
-                  }`}
-                >
-                  Español
-                </button>
-              </div>
-            </div>
-
-            <div className="mx-auto mb-1 flex h-10 items-center justify-center">
-              <div className="relative">
-                <img
-                  src="/logo.png"
-                  alt="Thankly logo"
-                  className="h-14 max-h-14 w-auto object-contain opacity-95 mix-blend-screen drop-shadow-[0_0_18px_rgba(56,189,248,1)]"
-                />
-                <div className="absolute inset-0 -z-10 blur-2xl opacity-60 bg-[radial-gradient(circle,rgba(56,189,248,0.6),transparent_70%)]" />
-              </div>
-            </div>
-
-            <div className="mt-0 flex items-center justify-center gap-2">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName}
-                  className="h-16 w-16 rounded-full border-4 border-white object-cover shadow-lg"
-                />
-              ) : null}
-
-              <div className="text-left">
-                <h1 className="text-xl font-bold text-white">
-                  {t.headline}
-                </h1>
-
-                <p className="mt-1 text-sm text-white/80">
-                  {bio || t.fallbackBio}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white px-6 pt-3 pb-5">
-          {success && (
-            <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4 text-center">
-              <p className="text-sm font-semibold text-green-700">
-                {t.successTitle}
-              </p>
-              <p className="mt-1 text-xs text-green-600">
-                {t.successSubtitle}
-              </p>
-            </div>
-          )}
-
-          {canceled && (
-            <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-center text-red-700 text-sm font-medium">
-              {t.canceled}
-            </div>
-          )}
-
-          <div className="mt-0 grid grid-cols-2 gap-1.5">
-            <button
-              onClick={() => setSelectedAmount("preset1")}
-              className={`rounded-2xl py-3 text-l font-bold text-slate-900 ${
-                selectedAmount === "preset1"
-                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
-                  : "border border-sky-100 bg-white"
-              }`}
-            >
-              ${(preset1 / 100).toFixed(0)}
-            </button>
-
-            <button
-              onClick={() => setSelectedAmount("preset2")}
-              className={`rounded-2xl py-3 text-l font-bold text-slate-900 ${
-                selectedAmount === "preset2"
-                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
-                  : "border border-sky-100 bg-white"
-              }`}
-            >
-              ${(preset2 / 100).toFixed(0)}
-            </button>
-
-            <button
-              onClick={() => setSelectedAmount("preset3")}
-              className={`rounded-2xl py-3 text-l font-bold text-slate-900 ${
-                selectedAmount === "preset3"
-                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
-                  : "border border-sky-100 bg-white"
-              }`}
-            >
-              ${(preset3 / 100).toFixed(0)}
-            </button>
-
-            <button
-              onClick={() => {
-                setSelectedAmount("custom");
-                setCustomMode("amount");
-              }}
-              className={`rounded-2xl py-3 text-lg font-bold ${
-                selectedAmount === "custom"
-                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
-                  : "border border-dashed border-slate-200 bg-white text-slate-500"
-              }`}
-            >
-              {t.custom}
-            </button>
-          </div>
-
-          {selectedAmount === "custom" && (
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-900">
-                {t.customTip}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                {t.customDescription}
-              </p>
-
-              <div className="mt-4 grid grid-cols-2 rounded-xl bg-white p-1 text-sm font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setCustomMode("amount")}
-                  className={`rounded-lg py-2 ${
-                    customMode === "amount"
-                      ? "bg-sky-600 text-white"
-                      : "text-slate-600"
-                  }`}
-                >
-                  {t.enterAmount}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCustomMode("calculator")}
-                  className={`rounded-lg py-2 ${
-                    customMode === "calculator"
-                      ? "bg-sky-600 text-white"
-                      : "text-slate-600"
-                  }`}
-                >
-                  {t.calculateFromBill}
-                </button>
-              </div>
-
-              {customMode === "amount" ? (
-                <div className="mt-4">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {t.tipAmount}
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min="5"
-                    step="0.01"
-                    value={customAmount}
-                    onChange={(e) => setCustomAmount(e.target.value)}
-                    placeholder="Example: 50.00"
-                    className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {t.billTotal}
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      value={billAmount}
-                      onChange={(e) => setBillAmount(e.target.value)}
-                      placeholder="Example: 80.00"
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {t.tipPercentage}
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="1"
-                      step="0.1"
-                      value={tipPercent}
-                      onChange={(e) => setTipPercent(e.target.value)}
-                      placeholder="Example: 25"
-                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4 rounded-xl bg-white p-3 text-sm">
-                <div className="flex justify-between text-slate-600">
-                  <span>{t.customTipLabel}</span>
-                  <span className="font-semibold text-slate-900">
-                    {formatMoney(amountInCents)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-2 rounded-2xl border border-sky-100 bg-sky-50 p-4">
-            <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={coverFee}
-                onChange={(e) => setCoverFee(e.target.checked)}
-                className="mt-1 h-4 w-4 accent-sky-600"
-              />
-
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  {t.keepFull}
-                </p>
-                <p className="mt-1 text-xs text-slate-600">
-                  {t.feeExplanation}
-                </p>
-              </div>
-            </label>
-
-            <div className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-600">
-              <div className="flex justify-between">
-                <span>{t.tip}</span>
-                <span>{formatMoney(amountInCents)}</span>
-              </div>
-
-              <div className="mt-1 flex justify-between">
-                <span>{t.processingFee}</span>
-                <span>
-                  {formatMoney(
-                    feeBreakdown.stripeFee + feeBreakdown.thanklyFee
-                  )}
-                </span>
-              </div>
-
-              <div className="mt-2 border-t border-slate-100 pt-2 flex justify-between font-semibold text-slate-900">
-                <span>{t.youPay}</span>
-                <span>{formatMoney(feeBreakdown.totalCharge)}</span>
-              </div>
-
-              <div className="mt-1 flex justify-between text-slate-500">
-                <span>{t.receives}</span>
-                <span>{formatMoney(feeBreakdown.workerReceives)}</span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={loading || amountInCents < 500}
-            className="mt-2 block w-full rounded-2xl bg-gradient-to-b from-sky-600 to-sky-500 py-4 text-center font-semibold text-white disabled:opacity-60"
-          >
-            {loading
-              ? t.processing
-              : amountInCents < 500
-              ? t.minimum
-              : `${t.continue} • ${formatMoney(feeBreakdown.totalCharge)}`}
-          </button>
-
-          <p className="mt-2 text-center text-xs text-slate-400">
-            {t.secure}
-          </p>
-        </div>
-      </div>
-    </main>
   );
 }
 </file>
@@ -1580,51 +1021,20 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
-<file path="app/api/update-worker-profile/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase-admin";
+<file path="app/auth/signin/page.tsx">
+"use client";
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-    const workerId = body?.workerId;
-    const fullName = body?.fullName?.trim();
-    const bio = body?.bio?.trim();
-
-    if (!workerId || !fullName) {
-      return NextResponse.json(
-        { error: "Missing worker ID or name" },
-        { status: 400 }
-      );
-    }
-
-    const supabase = createAdminClient();
-
-    const { error } = await supabase
-      .from("workers")
-      .update({
-        full_name: fullName,
-        bio: bio || null,
-      })
-      .eq("id", workerId);
-
-    if (error) {
-      console.error("Update worker profile error:", error);
-      return NextResponse.json(
-        { error: "Unable to update profile" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Update worker profile route error:", error);
-    return NextResponse.json(
-      { error: "Unexpected error" },
-      { status: 500 }
-    );
-  }
+export default function SignInRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    // Store intent and redirect to auth
+    sessionStorage.setItem("authView", "signin");
+    router.replace("/auth");
+  }, []);
+  return null;
 }
 </file>
 
@@ -2754,174 +2164,6 @@ export default function CopyLinkButton({
         ? "Copiar link"
         : "Copy link"}
     </button>
-  );
-}
-</file>
-
-<file path="components/EditWorkerProfile.tsx">
-"use client";
-
-import { useState } from "react";
-
-type Language = "en" | "es";
-
-type EditWorkerProfileProps = {
-  workerId: string;
-  initialName: string;
-  initialBio: string | null;
-  language?: Language;
-};
-
-export default function EditWorkerProfile({
-  workerId,
-  initialName,
-  initialBio,
-  language = "en",
-}: EditWorkerProfileProps) {
-  const [name, setName] = useState(initialName);
-  const [bio, setBio] = useState(initialBio ?? "");
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-
-  const t = {
-    title:
-      language === "en"
-        ? "Edit profile"
-        : "Editar perfil",
-
-    description:
-      language === "en"
-        ? "Update your public Thankly profile."
-        : "Actualiza tu perfil público de Thankly.",
-
-    displayName:
-      language === "en"
-        ? "Display name"
-        : "Nombre público",
-
-    bio:
-      language === "en"
-        ? "Bio"
-        : "Descripción",
-
-    bioPlaceholder:
-      language === "en"
-        ? "Tell people a little about yourself..."
-        : "Cuéntale algo a las personas sobre ti...",
-
-    save:
-      language === "en"
-        ? "Save profile"
-        : "Guardar perfil",
-
-    saving:
-      language === "en"
-        ? "Saving..."
-        : "Guardando...",
-
-    success:
-      language === "en"
-        ? "Profile updated successfully."
-        : "Perfil actualizado correctamente.",
-
-    error:
-      language === "en"
-        ? "Unable to update profile."
-        : "No se pudo actualizar el perfil.",
-  };
-
-  async function handleSave() {
-    setSaving(true);
-    setMessage("");
-
-    try {
-      const response = await fetch("/api/update-worker-profile", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          workerId,
-          fullName: name,
-          bio,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(data.error || t.error);
-        setSaving(false);
-        return;
-      }
-
-      setMessage(t.success);
-      setSaving(false);
-    } catch (error) {
-      console.error(error);
-      setMessage(t.error);
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="rounded-3xl bg-white p-6 shadow-xl">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900">
-          {t.title}
-        </h2>
-
-        <p className="mt-1 text-sm text-slate-500">
-          {t.description}
-        </p>
-      </div>
-
-      <div className="mt-5 grid gap-5">
-        <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {t.displayName}
-          </label>
-
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {t.bio}
-          </label>
-
-          <textarea
-            rows={4}
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            placeholder={t.bioPlaceholder}
-            className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-          >
-            {saving ? t.saving : t.save}
-          </button>
-
-          {message ? (
-            <p className="text-sm font-medium text-slate-600">
-              {message}
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </section>
   );
 }
 </file>
@@ -6291,6 +5533,566 @@ export function clamp(value: number, min: number, max: number) {
 }
 </file>
 
+<file path="app/[slug]/ServerTipClient.tsx">
+"use client";
+
+import { useMemo, useState } from "react";
+
+type TipAmount = "preset1" | "preset2" | "preset3" | "custom";
+type CustomMode = "amount" | "calculator";
+type Language = "en" | "es";
+
+type ServerTipClientProps = {
+  displayName: string;
+  bio?: string | null;
+  pageUrl: string;
+  avatarUrl?: string | null;
+  tipAmount1?: number | null;
+  tipAmount2?: number | null;
+  tipAmount3?: number | null;
+  success?: boolean;
+  canceled?: boolean;
+};
+
+type ParticleData = {
+  top: string;
+  left: string;
+  delay: string;
+  duration: string;
+};
+
+function seededRandom(seed: number) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function fixedPercent(value: number) {
+  return `${value.toFixed(3)}%`;
+}
+
+function fixedSeconds(value: number) {
+  return `${value.toFixed(3)}s`;
+}
+
+function buildParticles(count: number, seedOffset: number): ParticleData[] {
+  return Array.from({ length: count }, (_, i) => {
+    const seed = i + seedOffset;
+
+    const top = 8 + seededRandom(seed * 1.37) * 40;
+    const left = 4 + seededRandom(seed * 2.11) * 92;
+    const delay = seededRandom(seed * 3.73) * 8;
+    const duration = 1.4 + seededRandom(seed * 4.91) * 1.4;
+
+    return {
+      top: fixedPercent(top),
+      left: fixedPercent(left),
+      delay: fixedSeconds(delay),
+      duration: fixedSeconds(duration),
+    };
+  });
+}
+
+function formatMoney(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+export default function ServerTipClient({
+  displayName,
+  bio,
+  pageUrl,
+  avatarUrl,
+  tipAmount1,
+  tipAmount2,
+  tipAmount3,
+  success,
+  canceled,
+
+}: ServerTipClientProps) {
+  const [language, setLanguage] = useState<Language>("en");
+  const [selectedAmount, setSelectedAmount] = useState<TipAmount>("preset2");
+  const [coverFee, setCoverFee] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const preset1 = tipAmount1 ?? 500;
+  const preset2 = tipAmount2 ?? 1000;
+  const preset3 = tipAmount3 ?? 1500;
+  const [customMode, setCustomMode] = useState<CustomMode>("amount");
+  const [customAmount, setCustomAmount] = useState("");
+  const [billAmount, setBillAmount] = useState("");
+  const [tipPercent, setTipPercent] = useState("18");
+
+  const t = {
+    headline: language === "en" ? `Thank ${displayName}` : `Agradece a ${displayName}`,
+    fallbackBio: language === "en" ? "Make a day in seconds" : "Muestra tu agradecimiento",
+    successTitle: language === "en" ? "Tip sent successfully 🎉" : "Agradecimiento enviado 🎉",
+    successSubtitle:
+      language === "en"
+        ? `Thank you for supporting ${displayName}`
+        : `Gracias por reconocer a ${displayName}`,
+    canceled: language === "en" ? "Payment canceled" : "Pago cancelado",
+    custom: language === "en" ? "Custom" : "Otro",
+    customTip: language === "en" ? "Custom tip" : "Agradecimiento personalizado",
+    customDescription:
+      language === "en"
+        ? "Enter an amount directly or calculate from the bill."
+        : "Ingresa un monto o calcúlalo según la cuenta.",
+    enterAmount: language === "en" ? "Enter amount" : "Ingresar monto",
+    calculateFromBill: language === "en" ? "Calculate from bill" : "Calcular con cuenta",
+    tipAmount: language === "en" ? "Tip amount" : "Monto",
+    billTotal: language === "en" ? "Bill total" : "Total de la cuenta",
+    tipPercentage: language === "en" ? "Tip percentage" : "Porcentaje",
+    customTipLabel: language === "en" ? "Custom tip" : "Agradecimiento",
+    keepFull:
+      language === "en"
+        ? `Help ${displayName} keep 100% of your tip`
+        : `Haz que ${displayName} reciba el 100% de tu agradecimiento`,
+    feeExplanation:
+      language === "en"
+        ? `This covers payment processing so ${displayName} keeps the full tip.`
+        : `Esto cubre el procesamiento para que ${displayName} reciba todo el monto.`,
+    tip: language === "en" ? "Tip" : "Agradecimiento",
+    processingFee: language === "en" ? "Processing fee" : "Cargo de procesamiento",
+    youPay: language === "en" ? "You pay" : "Tu total",
+    receives: language === "en" ? `${displayName} receives` : `${displayName} recibe`,
+    minimum: language === "en" ? "Minimum tip is $5.00" : "Mínimo: $5.00",
+    processing: language === "en" ? "Processing..." : "Procesando...",
+    continue: language === "en" ? "Continue" : "Continuar",
+    secure: language === "en" ? "Secure checkout with Stripe" : "Pago seguro con Stripe",
+  };
+
+  const slug = useMemo(() => {
+    try {
+      const url = new URL(pageUrl);
+      return url.pathname.replace(/^\/+/, "");
+    } catch {
+      return "";
+    }
+  }, [pageUrl]);
+
+  const customAmountCents = useMemo(() => {
+    const amount = Number(customAmount);
+    if (!amount || amount <= 0) return 0;
+    return Math.round(amount * 100);
+  }, [customAmount]);
+
+  const calculatedTipCents = useMemo(() => {
+    const bill = Number(billAmount);
+    const percent = Number(tipPercent);
+
+    if (!bill || bill <= 0 || !percent || percent <= 0) return 0;
+
+    return Math.round(bill * 100 * (percent / 100));
+  }, [billAmount, tipPercent]);
+
+  const amountInCents = useMemo(() => {
+    if (selectedAmount === "preset1") return preset1;
+    if (selectedAmount === "preset2") return preset2;
+    if (selectedAmount === "preset3") return preset3;
+
+    if (selectedAmount === "custom") {
+      if (customMode === "amount") return customAmountCents;
+      return calculatedTipCents;
+    }
+
+    return preset2;
+  }, [selectedAmount, preset1, preset2, preset3, customMode, customAmountCents, calculatedTipCents]);
+
+  const feeBreakdown = useMemo(() => {
+    const stripeRate = 0.029;
+    const thanklyRate = 0.04;
+    const fixedFee = 30;
+
+    let totalCharge = amountInCents;
+    let stripeFee = 0;
+    let thanklyFee = 0;
+    let workerReceives = 0;
+
+    if (coverFee) {
+      totalCharge = Math.ceil(
+        (amountInCents + fixedFee) / (1 - stripeRate - thanklyRate)
+      );
+
+      stripeFee = Math.round(totalCharge * stripeRate) + fixedFee;
+      thanklyFee = Math.round(totalCharge * thanklyRate);
+      workerReceives = amountInCents;
+    } else {
+      totalCharge = amountInCents;
+
+      stripeFee = Math.round(amountInCents * stripeRate) + fixedFee;
+      thanklyFee = Math.round(amountInCents * thanklyRate);
+      workerReceives = amountInCents - stripeFee - thanklyFee;
+    }
+
+    return {
+      totalCharge,
+      stripeFee,
+      thanklyFee,
+      workerReceives,
+    };
+  }, [amountInCents, coverFee]);
+
+  const farParticles = useMemo(() => buildParticles(80, 100), []);
+  const nearParticles = useMemo(() => buildParticles(50, 500), []);
+
+  async function handleContinue() {
+    if (amountInCents < 500) {
+      alert(t.minimum);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await fetch("/api/create-payment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: amountInCents,
+          slug,
+          coverFee,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      alert(data.error || "Failed to create payment");
+    } catch (error) {
+      console.error("Payment redirect error:", error);
+      alert("Something went wrong starting payment.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
+        <div className="relative overflow-hidden bg-[linear-gradient(180deg,#08183c_0%,#0c2e6f_42%,#0a63c9_100%)] px-6 pt-3 pb-3 text-center">
+          <div className="pointer-events-none absolute inset-0">
+            {farParticles.map((p, i) => (
+              <span
+                key={`f-${i}`}
+                className="particle"
+                style={{
+                  top: p.top,
+                  left: p.left,
+                  animationDelay: p.delay,
+                  animationDuration: p.duration,
+                }}
+              />
+            ))}
+
+            {nearParticles.map((p, i) => (
+              <span
+                key={`n-${i}`}
+                className="particle-near"
+                style={{
+                  top: p.top,
+                  left: p.left,
+                  animationDelay: p.delay,
+                  animationDuration: p.duration,
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="relative">
+            <div className="mb-3 flex justify-center">
+              <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setLanguage("en")}
+                  className={`rounded-full px-3 py-1 ${
+                    language === "en" ? "bg-white text-sky-700" : "text-white/80"
+                  }`}
+                >
+                  English
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLanguage("es")}
+                  className={`rounded-full px-3 py-1 ${
+                    language === "es" ? "bg-white text-sky-700" : "text-white/80"
+                  }`}
+                >
+                  Español
+                </button>
+              </div>
+            </div>
+
+            <div className="mx-auto mb-1 flex h-10 items-center justify-center">
+              <div className="relative">
+                <img
+                  src="/logo.png"
+                  alt="Thankly logo"
+                  className="h-14 max-h-14 w-auto object-contain opacity-95 mix-blend-screen drop-shadow-[0_0_18px_rgba(56,189,248,1)]"
+                />
+                <div className="absolute inset-0 -z-10 blur-2xl opacity-60 bg-[radial-gradient(circle,rgba(56,189,248,0.6),transparent_70%)]" />
+              </div>
+            </div>
+
+            <div className="mt-0 flex items-center justify-center gap-2">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  className="h-16 w-16 rounded-full border-4 border-white object-cover shadow-lg"
+                />
+              ) : null}
+
+              <div className="text-left">
+                <h1 className="text-xl font-bold text-white">
+                  {t.headline}
+                </h1>
+
+                <p className="mt-1 text-sm text-white/80">
+                  {bio || t.fallbackBio}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white px-6 pt-3 pb-5">
+          {success && (
+            <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4 text-center">
+              <p className="text-sm font-semibold text-green-700">
+                {t.successTitle}
+              </p>
+              <p className="mt-1 text-xs text-green-600">
+                {t.successSubtitle}
+              </p>
+            </div>
+          )}
+
+          {canceled && (
+            <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-3 text-center text-red-700 text-sm font-medium">
+              {t.canceled}
+            </div>
+          )}
+
+          <div className="mt-0 grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => setSelectedAmount("preset1")}
+              className={`rounded-2xl py-3 text-l font-bold text-slate-900 ${
+                selectedAmount === "preset1"
+                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
+                  : "border border-sky-100 bg-white"
+              }`}
+            >
+              ${(preset1 / 100).toFixed(0)}
+            </button>
+
+            <button
+              onClick={() => setSelectedAmount("preset2")}
+              className={`rounded-2xl py-3 text-l font-bold text-slate-900 ${
+                selectedAmount === "preset2"
+                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
+                  : "border border-sky-100 bg-white"
+              }`}
+            >
+              ${(preset2 / 100).toFixed(0)}
+            </button>
+
+            <button
+              onClick={() => setSelectedAmount("preset3")}
+              className={`rounded-2xl py-3 text-l font-bold text-slate-900 ${
+                selectedAmount === "preset3"
+                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
+                  : "border border-sky-100 bg-white"
+              }`}
+            >
+              ${(preset3 / 100).toFixed(0)}
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedAmount("custom");
+                setCustomMode("amount");
+              }}
+              className={`rounded-2xl py-3 text-lg font-bold ${
+                selectedAmount === "custom"
+                  ? "border border-sky-300 bg-sky-50 ring-2 ring-sky-200"
+                  : "border border-dashed border-slate-200 bg-white text-slate-500"
+              }`}
+            >
+              {t.custom}
+            </button>
+          </div>
+
+          {selectedAmount === "custom" && (
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">
+                {t.customTip}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {t.customDescription}
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 rounded-xl bg-white p-1 text-sm font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setCustomMode("amount")}
+                  className={`rounded-lg py-2 ${
+                    customMode === "amount"
+                      ? "bg-sky-600 text-white"
+                      : "text-slate-600"
+                  }`}
+                >
+                  {t.enterAmount}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCustomMode("calculator")}
+                  className={`rounded-lg py-2 ${
+                    customMode === "calculator"
+                      ? "bg-sky-600 text-white"
+                      : "text-slate-600"
+                  }`}
+                >
+                  {t.calculateFromBill}
+                </button>
+              </div>
+
+              {customMode === "amount" ? (
+                <div className="mt-4">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t.tipAmount}
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="5"
+                    step="0.01"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    placeholder="Example: 50.00"
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {t.billTotal}
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={billAmount}
+                      onChange={(e) => setBillAmount(e.target.value)}
+                      placeholder="Example: 80.00"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {t.tipPercentage}
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="1"
+                      step="0.1"
+                      value={tipPercent}
+                      onChange={(e) => setTipPercent(e.target.value)}
+                      placeholder="Example: 25"
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 rounded-xl bg-white p-3 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span>{t.customTipLabel}</span>
+                  <span className="font-semibold text-slate-900">
+                    {formatMoney(amountInCents)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-2 rounded-2xl border border-sky-100 bg-sky-50 p-4">
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={coverFee}
+                onChange={(e) => setCoverFee(e.target.checked)}
+                className="mt-1 h-4 w-4 accent-sky-600"
+              />
+
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  {t.keepFull}
+                </p>
+                <p className="mt-1 text-xs text-slate-600">
+                  {t.feeExplanation}
+                </p>
+              </div>
+            </label>
+
+            <div className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-600">
+              <div className="flex justify-between">
+                <span>{t.tip}</span>
+                <span>{formatMoney(amountInCents)}</span>
+              </div>
+
+              <div className="mt-1 flex justify-between">
+                <span>{t.processingFee}</span>
+                <span>
+                  {formatMoney(
+                    feeBreakdown.stripeFee + feeBreakdown.thanklyFee
+                  )}
+                </span>
+              </div>
+
+              <div className="mt-2 border-t border-slate-100 pt-2 flex justify-between font-semibold text-slate-900">
+                <span>{t.youPay}</span>
+                <span>{formatMoney(feeBreakdown.totalCharge)}</span>
+              </div>
+
+              <div className="mt-1 flex justify-between text-slate-500">
+                <span>{t.receives}</span>
+                <span>{formatMoney(feeBreakdown.workerReceives)}</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleContinue}
+            disabled={loading || amountInCents < 500}
+            className="mt-2 block w-full rounded-2xl bg-gradient-to-b from-sky-600 to-sky-500 py-4 text-center font-semibold text-white disabled:opacity-60"
+          >
+            {loading
+              ? t.processing
+              : amountInCents < 500
+              ? t.minimum
+              : `${t.continue} • ${formatMoney(feeBreakdown.totalCharge)}`}
+          </button>
+
+          <p className="mt-2 text-center text-xs text-slate-400">
+            {t.secure}
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+</file>
+
 <file path="app/api/create-payment/route.ts">
 // app/api/create-payment/route.ts
 // Change: added avatar_url to both metadata blocks so success page can show worker photo.
@@ -6725,6 +6527,56 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/update-worker-profile/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase-admin";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+
+    const workerId = body?.workerId;
+    const fullName = body?.fullName?.trim();
+    const bio = body?.bio?.trim();
+    const bioEs = body?.bioEs?.trim();
+
+    if (!workerId || !fullName) {
+      return NextResponse.json(
+        { error: "Missing worker ID or name" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createAdminClient();
+
+    const { error } = await supabase
+      .from("workers")
+      .update({
+        full_name: fullName,
+        bio: bio || null,
+        bio_es: bioEs || null,
+      })
+      .eq("id", workerId);
+
+    if (error) {
+      console.error("Update worker profile error:", error);
+      return NextResponse.json(
+        { error: "Unable to update profile" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Update worker profile route error:", error);
+    return NextResponse.json(
+      { error: "Unexpected error" },
+      { status: 500 }
+    );
+  }
+}
+</file>
+
 <file path="app/disclosures/page.tsx">
 import type { Metadata } from 'next'
 import LegalLayout from '@/components/LegalLayout'
@@ -7014,689 +6866,198 @@ export default async function ManagePage() {
 }
 </file>
 
-<file path="app/success/page.tsx">
-// app/success/page.tsx
-// Fix: removed duplicate Done + Skip for now buttons that were rendering outside SuccessFeedbackCard.
-// Also adds avatar_url pass-through from session metadata for worker photo display.
-
-import { stripe } from "@/lib/stripe";
-import SuccessFeedbackCard from "@/components/SuccessFeedbackCard";
-
-type SuccessPageProps = {
-  searchParams: Promise<{
-    session_id?: string;
-  }>;
-};
-
-function formatDollars(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-export default async function SuccessPage({ searchParams }: SuccessPageProps) {
-  const { session_id } = await searchParams;
-
-  if (!session_id) {
-    return (
-      <main className="min-h-screen bg-[#173f73] flex items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-[32px] bg-white/10 p-8 text-center shadow-xl">
-          <h1 className="text-3xl font-black text-white">Payment received</h1>
-          <p className="mt-3 text-blue-100">
-            Thank you for showing appreciation through Thankly.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  const session = await stripe.checkout.sessions.retrieve(session_id);
-
-  const workerName = session.metadata?.worker_name || "your server";
-  const tipAmount = Number(session.metadata?.tip_amount ?? 0);
-  const avatarUrl = session.metadata?.avatar_url ?? null;
-  const workerInitial = workerName.charAt(0).toUpperCase();
-
-  return (
-    <main className="min-h-screen bg-[#173f73] px-5 py-8 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center rounded-[36px] border border-white/10 bg-[#1f4b82] px-7 py-10 shadow-2xl">
-
-        {/* Worker avatar — shows photo if available, falls back to initial */}
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={workerName}
-            className="h-28 w-28 rounded-full border-4 border-blue-200 object-cover shadow-xl"
-          />
-        ) : (
-          <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-blue-200 bg-blue-400 text-5xl font-black text-white shadow-xl">
-            {workerInitial}
-          </div>
-        )}
-
-        <div className="mt-12 text-5xl">🎉</div>
-
-        <h1 className="mt-8 text-center text-5xl font-black leading-tight">
-          You just made {workerName}&apos;s{" "}
-          <span className="text-sky-300">day!</span>
-        </h1>
-
-        <p className="mt-8 text-center text-2xl font-bold leading-relaxed text-blue-100">
-          They received your full {formatDollars(tipAmount)}.
-          <br />
-          Zero fees deducted.
-        </p>
-
-        <div className="my-10 h-1 w-20 rounded-full bg-white/20" />
-
-        {/*
-          SuccessFeedbackCard already contains its own Done button and Skip for now link.
-          Do NOT add another Done/Skip outside this component — that was the source of the duplicate.
-        */}
-        <SuccessFeedbackCard
-          workerId={session.metadata?.worker_id ?? ""}
-          workerName={workerName}
-          stripePaymentId={
-            typeof session.payment_intent === "string"
-              ? session.payment_intent
-              : null
-          }
-        />
-      </div>
-    </main>
-  );
-}
-</file>
-
-<file path="components/ManageDashboardClient.tsx">
+<file path="components/EditWorkerProfile.tsx">
 "use client";
 
-import { useMemo, useState } from "react";
-import ShareQrCard from "@/components/ShareQrCard";
-import EditWorkerProfile from "@/components/EditWorkerProfile";
-import ResumeStripeButton from "@/components/ResumeStripeButton";
-import TaxWithholdingCard from "@/components/TaxWithholdingCard";
-import ExportEarningsButton from "@/components/ExportEarningsButton";
-import AppNav from "@/components/AppNav";
+import { useState } from "react";
 
-type Filter = "today" | "week" | "month" | "all" | "custom";
 type Language = "en" | "es";
 
-type Worker = {
-  id: string;
-  full_name: string;
-  email: string;
-  bio: string | null;
-  profile_slug: string;
-  stripe_onboarded: boolean;
-  stripe_account_id: string | null;
-  tax_withholding_rate: number | null;
-  auth_user_id: string;
+type EditWorkerProfileProps = {
+  workerId: string;
+  initialName: string;
+  initialBio: string | null;
+  initialBioEs?: string | null;
+  language?: Language;
 };
 
-type Transaction = {
-  id: string;
-  tip_amount: number;
-  fee_amount: number;
-  worker_receives: number;
-  tax_reserve_amount: number;
-  available_amount: number;
-  status: string;
-  created_at: string;
-};
+export default function EditWorkerProfile({
+  workerId,
+  initialName,
+  initialBio,
+  initialBioEs,
+  language = "en",
+}: EditWorkerProfileProps) {
+  const [name, setName] = useState(initialName);
+  const [bio, setBio] = useState(initialBio ?? "");
+  const [bioEs, setBioEs] = useState(initialBioEs ?? "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
-type Props = {
-  worker: Worker;
-  transactions: Transaction[];
-  publicUrl: string;
-};
-
-function formatDollars(cents: number | null | undefined) {
-  return `$${((cents ?? 0) / 100).toFixed(2)}`;
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
-  return new Date(value).toLocaleString();
-}
-
-function formatStatus(value: string | null | undefined) {
-  if (!value) return "Unknown";
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function isInRange(
-  dateValue: string,
-  filter: Filter,
-  customStartDate: string,
-  customEndDate: string
-) {
-  const txDate = new Date(dateValue);
-  const now = new Date();
-
-  if (filter === "all") return true;
-
-  if (filter === "today") {
-    return txDate.toDateString() === now.toDateString();
-  }
-
-  if (filter === "week") {
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    return txDate >= startOfWeek;
-  }
-
-  if (filter === "month") {
-    return (
-      txDate.getFullYear() === now.getFullYear() &&
-      txDate.getMonth() === now.getMonth()
-    );
-  }
-
-  if (filter === "custom") {
-    if (!customStartDate && !customEndDate) return true;
-
-    const start = customStartDate ? new Date(customStartDate) : null;
-    const end = customEndDate ? new Date(customEndDate) : null;
-
-    if (start) {
-      start.setHours(0, 0, 0, 0);
-    }
-
-    if (end) {
-      end.setHours(23, 59, 59, 999);
-    }
-
-    if (start && txDate < start) return false;
-    if (end && txDate > end) return false;
-
-    return true;
-  }
-
-  return true;
-}
-
-export default function ManageDashboardClient({
-  worker,
-  transactions,
-  publicUrl,
-}: Props) {
-  const [language, setLanguage] = useState<Language>("en");
-  const [filter, setFilter] = useState<Filter>("today");
-  const [customStartDate, setCustomStartDate] = useState("");
-  const [customEndDate, setCustomEndDate] = useState("");
   const t = {
-    dashboard:
+    title:
       language === "en"
-        ? "Thankly Dashboard"
-        : "Panel de Thankly",
+        ? "Edit profile"
+        : "Editar perfil",
 
-    welcome:
+    description:
       language === "en"
-        ? `Welcome, ${worker.full_name}`
-        : `Bienvenido, ${worker.full_name}`,
+        ? "Update your public Thankly profile."
+        : "Actualiza tu perfil público de Thankly.",
 
-    subtitle:
+    displayName:
       language === "en"
-        ? "Manage your gratitude page, track earnings, and share your QR code."
-        : "Administra tu página de agradecimiento, revisa tus ingresos y comparte tu código QR.",
+        ? "Display name"
+        : "Nombre público",
 
-    stripeStatus:
+    bio:
       language === "en"
-        ? "Stripe Status"
-        : "Estado de Stripe",
+        ? "Bio"
+        : "Descripción",
 
-    ready:
+    bioPlaceholder:
       language === "en"
-        ? "✅ Ready"
-        : "✅ Listo",
+        ? "Tell people a little about yourself..."
+        : "Cuéntale algo a las personas sobre ti...",
 
-    readyText:
+    bioEs:
       language === "en"
-        ? "Ready to receive tips."
-        : "Listo para recibir agradecimientos.",
+        ? "Bio (Spanish) — optional"
+        : "Descripción (Español) — opcional",
 
-    setupIncomplete:
+    bioEsPlaceholder:
       language === "en"
-        ? "⚠️ Setup incomplete"
-        : "⚠️ Configuración incompleta",
+        ? "Shown to Spanish-speaking customers on your tip page..."
+        : "Se muestra a clientes hispanohablantes en tu página...",
 
-    finishStripe:
+    save:
       language === "en"
-        ? "Finish Stripe setup to receive payouts."
-        : "Completa Stripe para recibir pagos.",
+        ? "Save profile"
+        : "Guardar perfil",
 
-    today:
+    saving:
       language === "en"
-        ? "Today"
-        : "Hoy",
+        ? "Saving..."
+        : "Guardando...",
 
-    week:
+    success:
       language === "en"
-        ? "This Week"
-        : "Esta semana",
+        ? "Profile updated successfully."
+        : "Perfil actualizado correctamente.",
 
-    month:
+    error:
       language === "en"
-        ? "This Month"
-        : "Este mes",
-
-    all:
-      language === "en"
-        ? "All Time"
-        : "Todo",
-
-    custom:
-      language === "en"
-        ? "Custom"
-        : "Personalizado",
-
-    from:
-      language === "en"
-        ? "From"
-        : "Desde",
-
-    to:
-      language === "en"
-        ? "To"
-        : "Hasta",
-
-    workerReceives:
-      language === "en"
-        ? "Worker Receives"
-        : "Recibe",
-
-    beforeTax:
-      language === "en"
-        ? "Before tax pocket"
-        : "Antes de ahorro fiscal",
-
-    totalVolume:
-      language === "en"
-      ? "Total Volume"
-      : "Monto total",
-
-    grossProcessed:
-      language === "en"
-        ? "Gross tips processed"
-        : "Agradecimientos procesados",
-
-    totalTips:
-      language === "en"
-        ? "Total Tips"
-        : "Total",
-
-    completedPayments:
-      language === "en"
-        ? "Completed payments"
-        : "Pagos completados",
-
-    avgTip:
-      language === "en"
-        ? "Avg. Tip"
-        : "Promedio",
-
-    perCustomer:
-      language === "en"
-        ? "Per customer"
-        : "Por cliente",
-
-    recentTransactions:
-      language === "en"
-        ? "Recent Transactions"
-        : "Movimientos recientes",
-
-    recentSubtitle:
-      language === "en"
-        ? "Latest completed tips and Thankly fee breakdown."
-        : "Últimos agradecimientos completados y desglose de Thankly.",
-
-    thanklyFees:
-      language === "en"
-        ? "Thankly Fees"
-        : "Ingresos Thankly",
-
-    noTransactions:
-      language === "en"
-        ? "No transactions for this period."
-        : "No hay movimientos en este período.",
-
-    date:
-      language === "en"
-        ? "Date"
-        : "Fecha",
-
-    tip:
-      language === "en"
-        ? "Tip"
-        : "Agradecimiento",
-
-    fee:
-      language === "en"
-        ? "Fee"
-        : "Cargo",
-
-    taxReserve:
-      language === "en"
-        ? "Estimated Tax Pocket"
-        : "Reserva",
-
-    available:
-      language === "en"
-        ? "Safe-to-Spend"
-        : "Disponible",
-
-    status:
-      language === "en"
-        ? "Status"
-      : "Estado",
-    
+        ? "Unable to update profile."
+        : "No se pudo actualizar el perfil.",
   };
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) =>
-      isInRange(tx.created_at, filter, customStartDate, customEndDate)
-    );
-  }, [transactions, filter, customStartDate, customEndDate]);
+  async function handleSave() {
+    setSaving(true);
+    setMessage("");
 
-  const totalTips = filteredTransactions.length;
+    try {
+      const response = await fetch("/api/update-worker-profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          workerId,
+          fullName: name,
+          bio,
+          bioEs,
+        }),
+      });
 
-  const totalEarnedCents = filteredTransactions.reduce(
-    (sum, tx) => sum + (tx.worker_receives ?? 0),
-    0
-  );
+      const data = await response.json();
 
-  const totalVolumeCents = filteredTransactions.reduce(
-    (sum, tx) => sum + (tx.tip_amount ?? 0),
-    0
-  );
+      if (!response.ok) {
+        setMessage(data.error || t.error);
+        setSaving(false);
+        return;
+      }
 
-  const totalFeesCents = filteredTransactions.reduce(
-    (sum, tx) => sum + (tx.fee_amount ?? 0),
-    0
-  );
-
-  const avgTipCents =
-    totalTips > 0 ? Math.round(totalVolumeCents / totalTips) : 0;
-
-  const filters: { label: string; value: Filter }[] = [
-    { label: t.today, value: "today" },
-    { label: t.week, value: "week" },
-    { label: t.month, value: "month" },
-    { label: t.all, value: "all" },
-    { label: t.custom, value: "custom" },
-  ];
+      setMessage(t.success);
+      setSaving(false);
+    } catch (error) {
+      console.error(error);
+      setMessage(t.error);
+      setSaving(false);
+    }
+  }
 
   return (
-    <>
-    <AppNav variant="public" />
-    <main className="min-h-screen bg-slate-100 px-4 py-8">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
-          <div className="mb-5 flex justify-end">
-            <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white backdrop-blur">
-              <button
-                type="button"
-                onClick={() => setLanguage("en")}
-                className={`rounded-full px-3 py-1 ${
-                  language === "en"
-                    ? "bg-white text-sky-700"
-                    : "text-white/80"
-                }`}
-              >
-                English
-              </button>
+    <section className="rounded-3xl bg-white p-6 shadow-xl">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">
+          {t.title}
+        </h2>
 
-              <button
-                type="button"
-                onClick={() => setLanguage("es")}
-                className={`rounded-full px-3 py-1 ${
-                  language === "es"
-                    ? "bg-white text-sky-700"
-                    : "text-white/80"
-                }`}
-              >
-                Español
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-sky-100">
-                {t.dashboard}
-              </p>
-
-              <h1 className="mt-2 text-4xl font-bold tracking-tight">
-                {t.welcome}
-              </h1>
-
-              <p className="mt-2 max-w-2xl text-sm text-slate-100">
-                {t.subtitle}
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-white/15 px-5 py-4 shadow-lg backdrop-blur">
-              <p className="text-xs uppercase tracking-wide text-sky-100">
-                {t.stripeStatus}
-              </p>
-
-              {worker.stripe_onboarded ? (
-                <>
-                  <p className="mt-1 text-lg font-semibold">{t.ready}</p>
-                  <p className="mt-1 text-xs text-sky-100">
-                    {t.readyText}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-1 text-lg font-semibold">
-                    {t.setupIncomplete}
-                  </p>
-                  <p className="mt-1 text-xs text-sky-100">
-                    {t.finishStripe}
-                  </p>
-
-                  <ResumeStripeButton
-                    accountId={worker.stripe_account_id}
-                    authUserId={worker.auth_user_id}
-                    email={worker.email}
-                    fullName={worker.full_name}
-                    slug={worker.profile_slug}
-                  />
-                </>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl bg-white p-4 shadow-xl">
-          <div className="flex flex-wrap gap-2">
-            {filters.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setFilter(item.value)}
-                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-                  filter === item.value
-                    ? "bg-sky-600 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {filter === "custom" && (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {t.from}
-                </label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {t.to}
-                </label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-3xl border border-emerald-100 border-l-4 border-l-emerald-500 bg-emerald-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-emerald-700">
-              {t.workerReceives}
-            </p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(totalEarnedCents)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.beforeTax}</p>
-          </div>
-
-          <div className="rounded-3xl border border-sky-100 border-l-4 border-l-sky-500 bg-sky-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-sky-700">{t.totalVolume}</p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(totalVolumeCents)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.grossProcessed}</p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-100 border-l-4 border-l-amber-500 bg-amber-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-amber-700">{t.totalTips}</p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {totalTips}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.completedPayments}</p>
-          </div>
-
-          <div className="rounded-3xl border border-violet-100 border-l-4 border-l-violet-500 bg-violet-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-violet-700">{t.avgTip}</p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(avgTipCents)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.perCustomer}</p>
-          </div>
-        </section>
-
-        <TaxWithholdingCard
-          workerId={worker.id}
-          initialRate={worker.tax_withholding_rate}
-          totalEarnedCents={totalEarnedCents}
-          language={language}
-        />
-
-        <ShareQrCard publicUrl={publicUrl} workerName={worker.full_name} language={language} />
-
-        <EditWorkerProfile
-          workerId={worker.id}
-          initialName={worker.full_name}
-          initialBio={worker.bio}
-          language={language}
-        />
-
-        <section className="rounded-3xl bg-white p-6 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">
-                {t.recentTransactions}
-              </h2>
-              <p className="text-sm text-slate-500">
-                {t.recentSubtitle}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-2xl bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
-                {t.thanklyFees}: {formatDollars(totalFeesCents)}
-              </div>
-
-              <ExportEarningsButton
-                workerName={worker.full_name}
-                transactions={filteredTransactions}
-                language={language}
-              />
-            </div>
-
-          </div>
-
-          {filteredTransactions.length === 0 ? (
-            <p className="mt-6 text-slate-500">
-              {t.noTransactions}
-            </p>
-          ) : (
-            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">{t.date}</th>
-                    <th className="px-4 py-3 font-semibold">{t.tip}</th>
-                    <th className="px-4 py-3 font-semibold">{t.fee}</th>
-                    <th className="px-4 py-3 font-semibold">{t.workerReceives}</th>
-                    <th className="px-4 py-3 font-semibold">{t.taxReserve}</th>
-                    <th className="px-4 py-3 font-semibold">{t.available}</th>
-                    <th className="px-4 py-3 font-semibold">{t.status}</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredTransactions.map((tx) => (
-                    <tr
-                      key={tx.id}
-                      className="border-b border-slate-100 bg-white even:bg-slate-50 hover:bg-sky-50 transition"
-                    >
-                      <td className="px-4 py-4 text-slate-600">
-                        {formatDate(tx.created_at)}
-                      </td>
-
-                      <td className="px-4 py-4 font-bold text-slate-900">
-                        {formatDollars(tx.tip_amount)}
-                      </td>
-
-                      <td className="px-4 py-4 font-semibold text-slate-700">
-                        {formatDollars(tx.fee_amount)}
-                      </td>
-
-                      <td className="px-4 py-4 font-bold text-slate-900">
-                        {formatDollars(tx.worker_receives)}
-                      </td>
-
-                      <td className="px-4 py-4 font-semibold text-amber-700">
-                        {formatDollars(tx.tax_reserve_amount)}
-                      </td>
-
-                      <td className="px-4 py-4 font-bold text-emerald-700">
-                        {formatDollars(tx.available_amount)}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                          {formatStatus(tx.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <p className="mt-1 text-sm text-slate-500">
+          {t.description}
+        </p>
       </div>
-    </main>
-    </>
+
+      <div className="mt-5 grid gap-5">
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t.displayName}
+          </label>
+
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t.bio}
+          </label>
+
+          <textarea
+            rows={4}
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder={t.bioPlaceholder}
+            className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t.bioEs}
+          </label>
+
+          <textarea
+            rows={4}
+            value={bioEs}
+            onChange={(e) => setBioEs(e.target.value)}
+            placeholder={t.bioEsPlaceholder}
+            className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+          >
+            {saving ? t.saving : t.save}
+          </button>
+
+          {message ? (
+            <p className="text-sm font-medium text-slate-600">
+              {message}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }
 </file>
@@ -21723,6 +21084,108 @@ export default async function StripeReturnPage({
 }
 </file>
 
+<file path="app/success/page.tsx">
+// app/success/page.tsx
+// Fix: removed duplicate Done + Skip for now buttons that were rendering outside SuccessFeedbackCard.
+// Also adds avatar_url pass-through from session metadata for worker photo display.
+
+import { stripe } from "@/lib/stripe";
+import SuccessFeedbackCard from "@/components/SuccessFeedbackCard";
+
+type SuccessPageProps = {
+  searchParams: Promise<{
+    session_id?: string;
+  }>;
+};
+
+function formatDollars(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+export default async function SuccessPage({ searchParams }: SuccessPageProps) {
+  const { session_id } = await searchParams;
+
+  if (!session_id) {
+    return (
+      <main className="min-h-screen bg-[#173f73] flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-[32px] bg-white/10 p-8 text-center shadow-xl">
+          <h1 className="text-3xl font-black text-white">Payment received</h1>
+          <p className="mt-3 text-blue-100">
+            Thank you for showing appreciation through Thankly.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const session = await stripe.checkout.sessions.retrieve(session_id);
+
+  const workerName = session.metadata?.worker_name || "your server";
+  const tipAmount = Number(session.metadata?.tip_amount ?? 0);
+  const workerReceives = Number(session.metadata?.worker_receives ?? 0);
+  const customerCoveredFee = session.metadata?.customer_covered_fee === "true";
+  const avatarUrl = session.metadata?.avatar_url ?? null;
+  const workerInitial = workerName.charAt(0).toUpperCase();
+
+  return (
+    <main className="min-h-screen bg-[#173f73] px-5 py-8 text-white">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col items-center rounded-[36px] border border-white/10 bg-[#1f4b82] px-7 py-10 shadow-2xl">
+
+        {/* Worker avatar — shows photo if available, falls back to initial */}
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={workerName}
+            className="h-28 w-28 rounded-full border-4 border-blue-200 object-cover shadow-xl"
+          />
+        ) : (
+          <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-blue-200 bg-blue-400 text-5xl font-black text-white shadow-xl">
+            {workerInitial}
+          </div>
+        )}
+
+        <div className="mt-12 text-5xl">🎉</div>
+
+        <h1 className="mt-8 text-center text-5xl font-black leading-tight">
+          You just made {workerName}&apos;s{" "}
+          <span className="text-sky-300">day!</span>
+        </h1>
+
+        <p className="mt-8 text-center text-2xl font-bold leading-relaxed text-blue-100">
+          {customerCoveredFee ? (
+            <>
+              They received your full {formatDollars(tipAmount)}.
+              <br />
+              Zero fees deducted.
+            </>
+          ) : (
+            <>
+              They received {formatDollars(workerReceives)} from your {formatDollars(tipAmount)} tip.
+            </>
+          )}
+        </p>
+
+        <div className="my-10 h-1 w-20 rounded-full bg-white/20" />
+
+        {/*
+          SuccessFeedbackCard already contains its own Done button and Skip for now link.
+          Do NOT add another Done/Skip outside this component — that was the source of the duplicate.
+        */}
+        <SuccessFeedbackCard
+          workerId={session.metadata?.worker_id ?? ""}
+          workerName={workerName}
+          stripePaymentId={
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : null
+          }
+        />
+      </div>
+    </main>
+  );
+}
+</file>
+
 <file path="app/support/page.tsx">
 import type { Metadata } from 'next'
 import Link from 'next/link'
@@ -22140,6 +21603,608 @@ export default function LegalLayout({
       </footer>
     </>
   )
+}
+</file>
+
+<file path="components/ManageDashboardClient.tsx">
+"use client";
+
+import { useMemo, useState } from "react";
+import ShareQrCard from "@/components/ShareQrCard";
+import EditWorkerProfile from "@/components/EditWorkerProfile";
+import ResumeStripeButton from "@/components/ResumeStripeButton";
+import TaxWithholdingCard from "@/components/TaxWithholdingCard";
+import ExportEarningsButton from "@/components/ExportEarningsButton";
+import AppNav from "@/components/AppNav";
+
+type Filter = "today" | "week" | "month" | "all" | "custom";
+type Language = "en" | "es";
+
+type Worker = {
+  id: string;
+  full_name: string;
+  email: string;
+  bio: string | null;
+  bio_es: string | null;
+  profile_slug: string;
+  stripe_onboarded: boolean;
+  stripe_account_id: string | null;
+  tax_withholding_rate: number | null;
+  auth_user_id: string;
+};
+
+type Transaction = {
+  id: string;
+  tip_amount: number;
+  fee_amount: number;
+  worker_receives: number;
+  tax_reserve_amount: number;
+  available_amount: number;
+  status: string;
+  created_at: string;
+};
+
+type Props = {
+  worker: Worker;
+  transactions: Transaction[];
+  publicUrl: string;
+};
+
+function formatDollars(cents: number | null | undefined) {
+  return `$${((cents ?? 0) / 100).toFixed(2)}`;
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
+function formatStatus(value: string | null | undefined) {
+  if (!value) return "Unknown";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function isInRange(
+  dateValue: string,
+  filter: Filter,
+  customStartDate: string,
+  customEndDate: string
+) {
+  const txDate = new Date(dateValue);
+  const now = new Date();
+
+  if (filter === "all") return true;
+
+  if (filter === "today") {
+    return txDate.toDateString() === now.toDateString();
+  }
+
+  if (filter === "week") {
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    return txDate >= startOfWeek;
+  }
+
+  if (filter === "month") {
+    return (
+      txDate.getFullYear() === now.getFullYear() &&
+      txDate.getMonth() === now.getMonth()
+    );
+  }
+
+  if (filter === "custom") {
+    if (!customStartDate && !customEndDate) return true;
+
+    const start = customStartDate ? new Date(customStartDate) : null;
+    const end = customEndDate ? new Date(customEndDate) : null;
+
+    if (start) {
+      start.setHours(0, 0, 0, 0);
+    }
+
+    if (end) {
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (start && txDate < start) return false;
+    if (end && txDate > end) return false;
+
+    return true;
+  }
+
+  return true;
+}
+
+export default function ManageDashboardClient({
+  worker,
+  transactions,
+  publicUrl,
+}: Props) {
+  const [language, setLanguage] = useState<Language>("en");
+  const [filter, setFilter] = useState<Filter>("today");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const t = {
+    dashboard:
+      language === "en"
+        ? "Thankly Dashboard"
+        : "Panel de Thankly",
+
+    welcome:
+      language === "en"
+        ? `Welcome, ${worker.full_name}`
+        : `Bienvenido, ${worker.full_name}`,
+
+    subtitle:
+      language === "en"
+        ? "Manage your gratitude page, track earnings, and share your QR code."
+        : "Administra tu página de agradecimiento, revisa tus ingresos y comparte tu código QR.",
+
+    stripeStatus:
+      language === "en"
+        ? "Stripe Status"
+        : "Estado de Stripe",
+
+    ready:
+      language === "en"
+        ? "✅ Ready"
+        : "✅ Listo",
+
+    readyText:
+      language === "en"
+        ? "Ready to receive tips."
+        : "Listo para recibir agradecimientos.",
+
+    setupIncomplete:
+      language === "en"
+        ? "⚠️ Setup incomplete"
+        : "⚠️ Configuración incompleta",
+
+    finishStripe:
+      language === "en"
+        ? "Finish Stripe setup to receive payouts."
+        : "Completa Stripe para recibir pagos.",
+
+    today:
+      language === "en"
+        ? "Today"
+        : "Hoy",
+
+    week:
+      language === "en"
+        ? "This Week"
+        : "Esta semana",
+
+    month:
+      language === "en"
+        ? "This Month"
+        : "Este mes",
+
+    all:
+      language === "en"
+        ? "All Time"
+        : "Todo",
+
+    custom:
+      language === "en"
+        ? "Custom"
+        : "Personalizado",
+
+    from:
+      language === "en"
+        ? "From"
+        : "Desde",
+
+    to:
+      language === "en"
+        ? "To"
+        : "Hasta",
+
+    workerReceives:
+      language === "en"
+        ? "Worker Receives"
+        : "Recibe",
+
+    beforeTax:
+      language === "en"
+        ? "Before tax pocket"
+        : "Antes de ahorro fiscal",
+
+    totalVolume:
+      language === "en"
+      ? "Total Volume"
+      : "Monto total",
+
+    grossProcessed:
+      language === "en"
+        ? "Gross tips processed"
+        : "Agradecimientos procesados",
+
+    totalTips:
+      language === "en"
+        ? "Total Tips"
+        : "Total",
+
+    completedPayments:
+      language === "en"
+        ? "Completed payments"
+        : "Pagos completados",
+
+    avgTip:
+      language === "en"
+        ? "Avg. Tip"
+        : "Promedio",
+
+    perCustomer:
+      language === "en"
+        ? "Per customer"
+        : "Por cliente",
+
+    recentTransactions:
+      language === "en"
+        ? "Recent Transactions"
+        : "Movimientos recientes",
+
+    recentSubtitle:
+      language === "en"
+        ? "Latest completed tips and Thankly fee breakdown."
+        : "Últimos agradecimientos completados y desglose de Thankly.",
+
+    thanklyFees:
+      language === "en"
+        ? "Thankly Fees"
+        : "Ingresos Thankly",
+
+    noTransactions:
+      language === "en"
+        ? "No transactions for this period."
+        : "No hay movimientos en este período.",
+
+    date:
+      language === "en"
+        ? "Date"
+        : "Fecha",
+
+    tip:
+      language === "en"
+        ? "Tip"
+        : "Agradecimiento",
+
+    fee:
+      language === "en"
+        ? "Fee"
+        : "Cargo",
+
+    taxReserve:
+      language === "en"
+        ? "Estimated Tax Pocket"
+        : "Reserva",
+
+    available:
+      language === "en"
+        ? "Safe-to-Spend"
+        : "Disponible",
+
+    status:
+      language === "en"
+        ? "Status"
+      : "Estado",
+    
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) =>
+      isInRange(tx.created_at, filter, customStartDate, customEndDate)
+    );
+  }, [transactions, filter, customStartDate, customEndDate]);
+
+  const totalTips = filteredTransactions.length;
+
+  const totalEarnedCents = filteredTransactions.reduce(
+    (sum, tx) => sum + (tx.worker_receives ?? 0),
+    0
+  );
+
+  const totalVolumeCents = filteredTransactions.reduce(
+    (sum, tx) => sum + (tx.tip_amount ?? 0),
+    0
+  );
+
+  const totalFeesCents = filteredTransactions.reduce(
+    (sum, tx) => sum + (tx.fee_amount ?? 0),
+    0
+  );
+
+  const avgTipCents =
+    totalTips > 0 ? Math.round(totalVolumeCents / totalTips) : 0;
+
+  const filters: { label: string; value: Filter }[] = [
+    { label: t.today, value: "today" },
+    { label: t.week, value: "week" },
+    { label: t.month, value: "month" },
+    { label: t.all, value: "all" },
+    { label: t.custom, value: "custom" },
+  ];
+
+  return (
+    <>
+    <AppNav variant="app" />
+    <div className="bg-[#00B4D8]/15 border-b border-[#00B4D8]/30 px-[5%] py-3 flex items-center justify-between gap-4">
+      <p className="text-sm text-[#0F2347] font-medium">
+        🎉 You're in early! The Thankly app is coming soon to the App Store and Google Play. Manage your account here in the meantime.
+      </p>
+    </div>
+    <main className="min-h-screen bg-slate-100 px-4 py-8">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
+          <div className="mb-5 flex justify-end">
+            <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                className={`rounded-full px-3 py-1 ${
+                  language === "en"
+                    ? "bg-white text-sky-700"
+                    : "text-white/80"
+                }`}
+              >
+                English
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLanguage("es")}
+                className={`rounded-full px-3 py-1 ${
+                  language === "es"
+                    ? "bg-white text-sky-700"
+                    : "text-white/80"
+                }`}
+              >
+                Español
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-sky-100">
+                {t.dashboard}
+              </p>
+
+              <h1 className="mt-2 text-4xl font-bold tracking-tight">
+                {t.welcome}
+              </h1>
+
+              <p className="mt-2 max-w-2xl text-sm text-slate-100">
+                {t.subtitle}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-white/15 px-5 py-4 shadow-lg backdrop-blur">
+              <p className="text-xs uppercase tracking-wide text-sky-100">
+                {t.stripeStatus}
+              </p>
+
+              {worker.stripe_onboarded ? (
+                <>
+                  <p className="mt-1 text-lg font-semibold">{t.ready}</p>
+                  <p className="mt-1 text-xs text-sky-100">
+                    {t.readyText}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-lg font-semibold">
+                    {t.setupIncomplete}
+                  </p>
+                  <p className="mt-1 text-xs text-sky-100">
+                    {t.finishStripe}
+                  </p>
+
+                  <ResumeStripeButton
+                    accountId={worker.stripe_account_id}
+                    authUserId={worker.auth_user_id}
+                    email={worker.email}
+                    fullName={worker.full_name}
+                    slug={worker.profile_slug}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-4 shadow-xl">
+          <div className="flex flex-wrap gap-2">
+            {filters.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setFilter(item.value)}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  filter === item.value
+                    ? "bg-sky-600 text-white"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {filter === "custom" && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {t.from}
+                </label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {t.to}
+                </label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-3xl border border-emerald-100 border-l-4 border-l-emerald-500 bg-emerald-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-emerald-700">
+              {t.workerReceives}
+            </p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(totalEarnedCents)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.beforeTax}</p>
+          </div>
+
+          <div className="rounded-3xl border border-sky-100 border-l-4 border-l-sky-500 bg-sky-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-sky-700">{t.totalVolume}</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(totalVolumeCents)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.grossProcessed}</p>
+          </div>
+
+          <div className="rounded-3xl border border-amber-100 border-l-4 border-l-amber-500 bg-amber-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-amber-700">{t.totalTips}</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {totalTips}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.completedPayments}</p>
+          </div>
+
+          <div className="rounded-3xl border border-violet-100 border-l-4 border-l-violet-500 bg-violet-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-violet-700">{t.avgTip}</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(avgTipCents)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.perCustomer}</p>
+          </div>
+        </section>
+
+        <TaxWithholdingCard
+          workerId={worker.id}
+          initialRate={worker.tax_withholding_rate}
+          totalEarnedCents={totalEarnedCents}
+          language={language}
+        />
+
+        <ShareQrCard publicUrl={publicUrl} workerName={worker.full_name} language={language} />
+
+        <EditWorkerProfile
+          workerId={worker.id}
+          initialName={worker.full_name}
+          initialBio={worker.bio}
+          initialBioEs={worker.bio_es}
+          language={language}
+        />
+
+        <section className="rounded-3xl bg-white p-6 shadow-xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {t.recentTransactions}
+              </h2>
+              <p className="text-sm text-slate-500">
+                {t.recentSubtitle}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-2xl bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
+                {t.thanklyFees}: {formatDollars(totalFeesCents)}
+              </div>
+
+              <ExportEarningsButton
+                workerName={worker.full_name}
+                transactions={filteredTransactions}
+                language={language}
+              />
+            </div>
+
+          </div>
+
+          {filteredTransactions.length === 0 ? (
+            <p className="mt-6 text-slate-500">
+              {t.noTransactions}
+            </p>
+          ) : (
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">{t.date}</th>
+                    <th className="px-4 py-3 font-semibold">{t.tip}</th>
+                    <th className="px-4 py-3 font-semibold">{t.fee}</th>
+                    <th className="px-4 py-3 font-semibold">{t.workerReceives}</th>
+                    <th className="px-4 py-3 font-semibold">{t.taxReserve}</th>
+                    <th className="px-4 py-3 font-semibold">{t.available}</th>
+                    <th className="px-4 py-3 font-semibold">{t.status}</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredTransactions.map((tx) => (
+                    <tr
+                      key={tx.id}
+                      className="border-b border-slate-100 bg-white even:bg-slate-50 hover:bg-sky-50 transition"
+                    >
+                      <td className="px-4 py-4 text-slate-600">
+                        {formatDate(tx.created_at)}
+                      </td>
+
+                      <td className="px-4 py-4 font-bold text-slate-900">
+                        {formatDollars(tx.tip_amount)}
+                      </td>
+
+                      <td className="px-4 py-4 font-semibold text-slate-700">
+                        {formatDollars(tx.fee_amount)}
+                      </td>
+
+                      <td className="px-4 py-4 font-bold text-slate-900">
+                        {formatDollars(tx.worker_receives)}
+                      </td>
+
+                      <td className="px-4 py-4 font-semibold text-amber-700">
+                        {formatDollars(tx.tax_reserve_amount)}
+                      </td>
+
+                      <td className="px-4 py-4 font-bold text-emerald-700">
+                        {formatDollars(tx.available_amount)}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                          {formatStatus(tx.status)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+    </>
+  );
 }
 </file>
 
@@ -30238,6 +30303,624 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="app/auth/page.tsx">
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
+
+type View = "select" | "worker_signup" | "business_signup" | "signin" | "check_email";
+
+import { Suspense } from "react";
+
+function AuthContent() {
+  const router = useRouter();
+  const [view, setView] = useState<View>("select");
+
+  useEffect(() => {
+    const intent = sessionStorage.getItem("authView");
+    if (intent === "signin") {
+      setView("signin");
+      sessionStorage.removeItem("authView");
+    }
+  }, []);
+  // Shared
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [workerInfo, setWorkerInfo] = useState(false);
+  const [businessInfo, setBusinessInfo] = useState(false);
+
+  // Worker signup
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+
+  // Business signup
+  const [businessName, setBusinessName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+
+  async function handleWorkerSignup() {
+    setError("");
+    if (!fullName.trim()) return setError("Enter your full name.");
+    if (!email.trim()) return setError("Enter your email address.");
+    if (password.length < 8) return setError("Password must be at least 8 characters.");
+    if (!phone.trim()) return setError("Enter your phone number.");
+
+    setLoading(true);
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { full_name: fullName.trim() },
+        emailRedirectTo: "https://getthankly.com/auth/confirm?next=create",
+      },
+    });
+    setLoading(false);
+
+    if (signUpError) {
+      const msg = signUpError.message.toLowerCase().includes("already")
+        ? "An account with this email already exists. Try signing in instead."
+        : signUpError.message;
+      setError(msg);
+      return;
+    }
+
+    setView("check_email");
+  }
+
+  async function handleBusinessSignup() {
+    setError("");
+    if (!businessName.trim()) return setError("Enter your business name.");
+    if (!ownerName.trim()) return setError("Enter your name.");
+    if (!email.trim()) return setError("Enter your email address.");
+    if (password.length < 8) return setError("Password must be at least 8 characters.");
+
+    setLoading(true);
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { full_name: ownerName.trim(), business_name: businessName.trim() },
+        emailRedirectTo: "https://getthankly.com/auth/confirm?next=business",
+      },
+    });
+    setLoading(false);
+
+    if (signUpError) {
+      const msg = signUpError.message.toLowerCase().includes("already")
+        ? "An account with this email already exists. Try signing in instead."
+        : signUpError.message;
+      setError(msg);
+      return;
+    }
+
+    setView("check_email");
+  }
+
+  async function handleSignIn() {
+    setError("");
+    if (!email.trim() || !password) return setError("Enter your email and password.");
+
+    setLoading(true);
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    setLoading(false);
+
+    if (signInError) {
+      setError("Incorrect email or password. Please try again.");
+      return;
+    }
+
+    // Route based on whether they have a worker record
+    const { data: worker } = await supabase
+      .from("workers")
+      .select("profile_slug")
+      .eq("auth_user_id", data.user.id)
+      .single();
+
+    if (worker?.profile_slug) {
+      router.push("/manage");
+    } else {
+      router.push("/create");
+    }
+  }
+
+  const inputClass = "w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0f3f73]";
+  const btnPrimary = "w-full rounded-2xl bg-[#0f3f73] py-3 text-white font-semibold text-sm hover:bg-[#0a2f5e] transition disabled:opacity-60";
+  const btnSecondary = "w-full rounded-2xl border border-slate-200 py-3 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition";
+
+  return (
+    <>
+    <AppNav variant="public" backLabel="← Back to home" backHref="/" />
+    <main className="min-h-screen bg-slate-100 flex flex-col items-center justify-center px-3 sm:px-6 pt-4 pb-8">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="text-center mb-3 flex flex-col items-center">
+          <img src="/images/app-icon-true.png" alt="Thankly" className="w-16 h-16 rounded-2xl mb-2 object-contain" />
+          <h1 className="text-xl font-black text-[#0A1F44]">Thankly</h1>
+          <p className="text-sm text-[#0A1F44]/75 mt-0.5">Your Tips. Your Money.</p>
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-900/10 p-4">
+
+          {/* ── ROLE SELECTOR ── */}
+          {view === "select" && (
+            <>
+              <h2 className="text-lg font-bold text-slate-900 text-center mb-1">Get started</h2>
+              <p className="text-sm text-slate-500 text-center mb-6">Choose the account you want to create</p>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="relative">
+                  <button
+                    onClick={() => { setError(""); setView("worker_signup"); }}
+                    className="w-full flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
+                  >
+                    <span className="text-3xl">👤</span>
+                    <span className="font-bold text-slate-900 text-sm">Worker</span>
+                    <span className="text-xs text-slate-500 text-center leading-tight">I receive tips</span>
+                  </button>
+                  <button
+                    onClick={() => setWorkerInfo(w => !w)}
+                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs font-bold hover:bg-slate-200 flex items-center justify-center"
+                  >i</button>
+                  {workerInfo && (
+                    <div className="absolute z-10 top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl text-xs text-slate-600 leading-relaxed">
+                      A Worker account is for individuals who receive tips. You'll get a personal QR code, earnings dashboard, payouts to your bank, and a built-in Tax Pocket to set aside funds for tax season.
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <button
+                    onClick={() => { setError(""); setView("business_signup"); }}
+                    className="w-full flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
+                  >
+                    <span className="text-3xl">🏢</span>
+                    <span className="font-bold text-slate-900 text-sm">Business</span>
+                    <span className="text-xs text-slate-500 text-center leading-tight">I manage a team</span>
+                  </button>
+                  <button
+                    onClick={() => setBusinessInfo(b => !b)}
+                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs font-bold hover:bg-slate-200 flex items-center justify-center"
+                  >i</button>
+                  {businessInfo && (
+                    <div className="absolute z-10 top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl text-xs text-slate-600 leading-relaxed">
+                      A Business account is for managers and owners who oversee a team of tipped workers. You'll get a team dashboard, combined earnings reports, and worker QR code management.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative flex items-center mb-5">
+                <div className="flex-1 border-t border-slate-200" />
+                <span className="px-3 text-xs text-slate-400">or</span>
+                <div className="flex-1 border-t border-slate-200" />
+              </div>
+
+              <button onClick={() => { setError(""); setView("signin"); }} className={btnSecondary}>
+                Sign in to existing account
+              </button>
+            </>
+          )}
+
+          {/* ── WORKER SIGNUP ── */}
+          {view === "worker_signup" && (
+            <>
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
+                ← Back
+              </button>
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Worker Account</h2>
+              <p className="text-sm text-slate-500 mb-5">For individuals who receive tips.</p>
+
+              <div className="space-y-3">
+                <input type="text" placeholder="Full name" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClass} />
+                <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
+                <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
+                <input type="tel" placeholder="Phone number (e.g. 4075551234)" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} />
+                <p className="text-xs text-slate-400 text-center">By continuing, you consent to receive a verification SMS. Standard message and data rates may apply.</p>
+              </div>
+
+              {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
+
+              <button onClick={handleWorkerSignup} disabled={loading} className={`${btnPrimary} mt-5`}>
+                {loading ? "Creating account..." : "Create Worker Account"}
+              </button>
+
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Secure registration — your data is encrypted
+              </p>
+              <button onClick={() => { setError(""); setView("signin"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
+                Already have an account? Sign in
+              </button>
+            </>
+          )}
+
+          {/* ── BUSINESS SIGNUP ── */}
+          {view === "business_signup" && (
+            <>
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
+                ← Back
+              </button>
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Business Account</h2>
+              <p className="text-sm text-slate-500 mb-5">For managers and business owners.</p>
+
+              <div className="space-y-3">
+                <input type="text" placeholder="Business name" value={businessName} onChange={e => setBusinessName(e.target.value)} className={inputClass} />
+                <input type="text" placeholder="Your name" value={ownerName} onChange={e => setOwnerName(e.target.value)} className={inputClass} />
+                <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
+                <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
+              </div>
+
+              {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
+
+              <button onClick={handleBusinessSignup} disabled={loading} className={`${btnPrimary} mt-5`}>
+                {loading ? "Creating account..." : "Create Business Account"}
+              </button>
+
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Secure registration — your data is encrypted
+              </p>
+              <button onClick={() => { setError(""); setView("signin"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
+                Already have an account? Sign in
+              </button>
+            </>
+          )}
+
+          {/* ── SIGN IN ── */}
+          {view === "signin" && (
+            <>
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
+                ← Back
+              </button>
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Welcome back</h2>
+              <p className="text-sm text-slate-500 mb-5">Sign in to your Thankly account.</p>
+
+              <div className="space-y-3">
+                <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
+                <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
+              </div>
+
+              <div className="mt-2 text-right">
+                <a href="/auth/reset-password" className="text-xs text-[#0f3f73] hover:underline">Forgot password?</a>
+              </div>
+
+              {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
+
+              <button onClick={handleSignIn} disabled={loading} className={`${btnPrimary} mt-4`}>
+                {loading ? "Signing in..." : "Sign in"}
+              </button>
+
+              <button onClick={() => { setError(""); setView("select"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
+                Don't have an account? Get started
+              </button>
+            </>
+          )}
+
+          {/* ── CHECK EMAIL ── */}
+          {view === "check_email" && (
+            <>
+              <div className="text-center">
+                <div className="text-5xl mb-4">📬</div>
+                <h2 className="text-lg font-bold text-slate-900 mb-2">Check your email</h2>
+                <p className="text-sm text-slate-500 mb-2">A confirmation link has been sent to <strong>{email}</strong>.</p>
+                <p className="text-sm text-slate-500">Tap the link to activate your account. If you don't see it, check your spam or junk folder.</p>
+              </div>
+              <button onClick={() => setView("signin")} className={`${btnSecondary} mt-6`}>
+                Back to sign in
+              </button>
+            </>
+          )}
+
+        {/* Download the app — inside card */}
+          <div className="mt-5 pt-4 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-400 mb-3">Prefer the app? Download Thankly for free.</p>
+            <div className="flex items-center justify-center gap-3">
+              <a href="https://apps.apple.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-black text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                App Store
+              </a>
+              <a href="https://play.google.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-black text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.3.17.64.24.99.2l12.6-7.28-2.72-2.72-10.87 9.8zm-1.9-20.7C1.1 3.4 1 3.73 1 4.1v15.8c0 .37.1.7.28.99l.1.09 8.85-8.85v-.2L1.38 3.04l-.1.02zM20.1 10.8l-2.54-1.47-3.03 3.03 3.03 3.03 2.56-1.48c.73-.42.73-1.1 0-1.52v-.59zm-18.72 11.4l.09-.05 10.1-5.83-2.72-2.72-7.47 8.6z"/></svg>
+                Google Play
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>    
+    </main>
+    </>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense>
+      <AuthContent />
+    </Suspense>
+  );
+}
+</file>
+
+<file path="app/business/create/page.tsx">
+"use client";
+
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
+
+type Language = "en" | "es";
+type Step = "name" | "account";
+
+export default function CreateBusinessPage() {
+  const [language, setLanguage] = useState<Language>("en");
+  const [step, setStep] = useState<Step>("name");
+  const [businessName, setBusinessName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+      setAuthChecking(false);
+    }
+    checkAuth();
+  }, []);
+
+  const t = {
+    title: language === "en" ? "Create your business" : "Crea tu negocio",
+    subtitle: language === "en"
+      ? "Set up a business profile to manage team reporting."
+      : "Configura un perfil de negocio para administrar reportes del equipo.",
+    namePlaceholder: language === "en"
+      ? "Business name, e.g. Blue Lagoon"
+      : "Nombre del negocio, ej. Blue Lagoon",
+    next: language === "en" ? "Continue" : "Continuar",
+    createAccount: language === "en" ? "Create account & business" : "Crear cuenta y negocio",
+    createBusiness: language === "en" ? "Create business" : "Crear negocio",
+    loading: language === "en" ? "Creating..." : "Creando...",
+    emailPlaceholder: language === "en" ? "Email address" : "Correo electrónico",
+    passwordPlaceholder: language === "en" ? "Create a password" : "Crea una contraseña",
+    alreadyHaveAccount: language === "en" ? "Already have an account?" : "¿Ya tienes cuenta?",
+    signIn: language === "en" ? "Sign in" : "Inicia sesión",
+    missingName: language === "en" ? "Please enter a business name." : "Ingresa el nombre del negocio.",
+    missingEmail: language === "en" ? "Please enter your email." : "Ingresa tu correo.",
+    missingPassword: language === "en" ? "Please create a password." : "Crea una contraseña.",
+    step1of2: language === "en" ? "Step 1 of 2 — Business info" : "Paso 1 de 2 — Info del negocio",
+    step2of2: language === "en" ? "Step 2 of 2 — Your account" : "Paso 2 de 2 — Tu cuenta",
+  };
+
+  async function handleNameNext() {
+    setErrorMessage("");
+    if (!businessName.trim()) {
+      setErrorMessage(t.missingName);
+      return;
+    }
+    setStep("account");
+  }
+
+  async function createBusiness(userId?: string) {
+    setLoading(true);
+    setErrorMessage("");
+
+    let ownerAuthUserId = userId;
+
+    if (!ownerAuthUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      ownerAuthUserId = user?.id;
+    }
+
+    if (!ownerAuthUserId) {
+      setLoading(false);
+      setErrorMessage("Unable to verify your account. Please try again.");
+      return;
+    }
+
+    const response = await fetch("/api/business/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: businessName.trim(),
+        ownerAuthUserId,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setLoading(false);
+      setErrorMessage(data.error || "Unable to create business.");
+      return;
+    }
+
+    window.location.href = `/business/${data.slug}`;
+  }
+
+  async function handleCreateAccountAndBusiness() {
+    setErrorMessage("");
+
+    if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
+    if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
+      setLoading(false);
+      setErrorMessage(error.message);
+      return;
+    }
+
+    await createBusiness(data.user?.id);
+  }
+
+  async function handleSignInAndBusiness() {
+    setErrorMessage("");
+
+    if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
+    if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
+      setLoading(false);
+      setErrorMessage(error.message);
+      return;
+    }
+
+    await createBusiness(data.user?.id);
+  }
+
+  if (authChecking) {
+    return (
+      <>
+      <AppNav variant="app" />
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Loading...</p>
+      </main>
+      </>
+    );
+  }
+
+  return (
+    <>
+    <AppNav variant="app" />
+    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+
+        {/* Header */}
+        <div className="bg-gradient-to-b from-teal-700 to-blue-950 px-6 py-6 text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white">
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                className={`rounded-full px-3 py-1 ${language === "en" ? "bg-white text-sky-700" : "text-white/80"}`}
+              >
+                English
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage("es")}
+                className={`rounded-full px-3 py-1 ${language === "es" ? "bg-white text-sky-700" : "text-white/80"}`}
+              >
+                Español
+              </button>
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-white">{t.title}</h1>
+          <p className="mt-1 text-sm text-white/80">{t.subtitle}</p>
+          <p className="mt-3 text-xs text-white/60">
+            {step === "name" ? t.step1of2 : t.step2of2}
+          </p>
+        </div>
+
+        {/* Step 1 — Business name */}
+        {step === "name" && (
+          <div className="p-6">
+            <input
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder={t.namePlaceholder}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              onKeyDown={(e) => e.key === "Enter" && handleNameNext()}
+            />
+
+            {errorMessage ? (
+              <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={handleNameNext}
+              disabled={loading}
+              className="mt-5 w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+            >
+              {loading ? t.loading : t.next}
+            </button>
+          </div>
+        )}
+
+        {/* Step 2 — Account creation (only if not authenticated) */}
+        {step === "account" && (
+          <div className="p-6">
+            <button
+              type="button"
+              onClick={() => { setStep("name"); setErrorMessage(""); }}
+              className="mb-4 text-sm text-slate-400 hover:text-slate-600"
+            >
+              ← {businessName}
+            </button>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t.emailPlaceholder}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t.passwordPlaceholder}
+              className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+
+            {errorMessage ? (
+              <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={handleCreateAccountAndBusiness}
+              disabled={loading}
+              className="mt-5 w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+            >
+              {loading ? t.loading : t.createAccount}
+            </button>
+
+            <div className="mt-4 flex items-center justify-center gap-1 text-sm text-slate-500">
+              <span>{t.alreadyHaveAccount}</span>
+              <button
+                type="button"
+                onClick={() => window.location.href = "/auth"}
+                disabled={loading}
+                className="font-semibold text-sky-600 hover:underline disabled:opacity-60"
+              >
+                {t.signIn}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+    </>
+  );
+}
+</file>
+
 <file path="app/page.tsx">
 'use client'
 
@@ -30281,14 +30964,14 @@ export default function HomePage() {
           <Image src="/images/thanklyappicon.png" alt="Thankly" width={36} height={36} className="rounded-lg" />
           Thankly
         </Link>
-        <ul className="hidden md:flex items-center gap-8 list-none">
+        <ul className="flex items-center gap-4 md:gap-8 list-none">
           {[
             { href: '#how-it-works', label: 'How it works' },
             { href: '#features', label: 'Features' },
             { href: '#founding', label: 'Founding 500' },
             { href: '#business', label: 'For Business' },
           ].map((link) => (
-            <li key={link.href}>
+            <li key={link.href} className="hidden md:block">
               <a href={link.href} className="text-white/80 text-sm font-medium hover:text-white transition-colors">
                 {link.label}
               </a>
@@ -30296,10 +30979,18 @@ export default function HomePage() {
           ))}
           <li>
             <a
+              href="/auth/signin"
+              className="text-white/80 text-sm font-medium hover:text-white transition-colors"
+            >
+              Sign in
+            </a>
+          </li>
+          <li>
+            <a
               href="/auth"
               className="bg-[#00B4D8] text-[#0F2347] font-bold text-sm px-5 py-2 rounded-full hover:bg-[#90E0EF] transition-colors"
             >
-              Join Free
+              Sign up
             </a>
           </li>
         </ul>
@@ -30639,8 +31330,8 @@ export default function HomePage() {
             <a href="/auth" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
               Get started free
             </a>
-            <a href="#how-it-works" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
-              Learn more
+            <a href="/auth/signin" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
+              Sign in
             </a>
           </div>
         </div>
@@ -30728,607 +31419,6 @@ export default function HomePage() {
       `}</style>
     </div>
   )
-}
-</file>
-
-<file path="app/auth/page.tsx">
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import AppNav from "@/components/AppNav";
-
-type View = "select" | "worker_signup" | "business_signup" | "signin" | "check_email";
-
-export default function AuthPage() {
-  const router = useRouter();
-  const [view, setView] = useState<View>("select");
-
-  // Shared
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [workerInfo, setWorkerInfo] = useState(false);
-  const [businessInfo, setBusinessInfo] = useState(false);
-
-  // Worker signup
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-
-  // Business signup
-  const [businessName, setBusinessName] = useState("");
-  const [ownerName, setOwnerName] = useState("");
-
-  async function handleWorkerSignup() {
-    setError("");
-    if (!fullName.trim()) return setError("Enter your full name.");
-    if (!email.trim()) return setError("Enter your email address.");
-    if (password.length < 8) return setError("Password must be at least 8 characters.");
-    if (!phone.trim()) return setError("Enter your phone number.");
-
-    setLoading(true);
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: { full_name: fullName.trim() },
-        emailRedirectTo: "https://getthankly.com/auth/confirm?next=create",
-      },
-    });
-    setLoading(false);
-
-    if (signUpError) {
-      const msg = signUpError.message.toLowerCase().includes("already")
-        ? "An account with this email already exists. Try signing in instead."
-        : signUpError.message;
-      setError(msg);
-      return;
-    }
-
-    setView("check_email");
-  }
-
-  async function handleBusinessSignup() {
-    setError("");
-    if (!businessName.trim()) return setError("Enter your business name.");
-    if (!ownerName.trim()) return setError("Enter your name.");
-    if (!email.trim()) return setError("Enter your email address.");
-    if (password.length < 8) return setError("Password must be at least 8 characters.");
-
-    setLoading(true);
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: { full_name: ownerName.trim(), business_name: businessName.trim() },
-        emailRedirectTo: "https://getthankly.com/auth/confirm?next=business",
-      },
-    });
-    setLoading(false);
-
-    if (signUpError) {
-      const msg = signUpError.message.toLowerCase().includes("already")
-        ? "An account with this email already exists. Try signing in instead."
-        : signUpError.message;
-      setError(msg);
-      return;
-    }
-
-    setView("check_email");
-  }
-
-  async function handleSignIn() {
-    setError("");
-    if (!email.trim() || !password) return setError("Enter your email and password.");
-
-    setLoading(true);
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setLoading(false);
-
-    if (signInError) {
-      setError("Incorrect email or password. Please try again.");
-      return;
-    }
-
-    // Route based on whether they have a worker record
-    const { data: worker } = await supabase
-      .from("workers")
-      .select("profile_slug")
-      .eq("auth_user_id", data.user.id)
-      .single();
-
-    if (worker?.profile_slug) {
-      router.push("/manage");
-    } else {
-      router.push("/create");
-    }
-  }
-
-  const inputClass = "w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0f3f73]";
-  const btnPrimary = "w-full rounded-2xl bg-[#0f3f73] py-3 text-white font-semibold text-sm hover:bg-[#0a2f5e] transition disabled:opacity-60";
-  const btnSecondary = "w-full rounded-2xl border border-slate-200 py-3 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition";
-
-  return (
-    <>
-    <AppNav variant="public" backLabel="← Back to home" backHref="/" />
-    <main className="min-h-screen bg-slate-100 flex flex-col items-center justify-center px-3 sm:px-6 pt-4 pb-8">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-3 flex flex-col items-center">
-          <img src="/images/app-icon-true.png" alt="Thankly" className="w-16 h-16 rounded-2xl mb-2 object-contain" />
-          <h1 className="text-xl font-black text-[#0A1F44]">Thankly</h1>
-          <p className="text-sm text-[#0A1F44]/75 mt-0.5">Your Tips. Your Money.</p>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-900/10 p-4">
-
-          {/* ── ROLE SELECTOR ── */}
-          {view === "select" && (
-            <>
-              <h2 className="text-lg font-bold text-slate-900 text-center mb-1">Get started</h2>
-              <p className="text-sm text-slate-500 text-center mb-6">Choose the account you want to create</p>
-
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="relative">
-                  <button
-                    onClick={() => { setError(""); setView("worker_signup"); }}
-                    className="w-full flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
-                  >
-                    <span className="text-3xl">👤</span>
-                    <span className="font-bold text-slate-900 text-sm">Worker</span>
-                    <span className="text-xs text-slate-500 text-center leading-tight">I receive tips</span>
-                  </button>
-                  <button
-                    onClick={() => setWorkerInfo(w => !w)}
-                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs font-bold hover:bg-slate-200 flex items-center justify-center"
-                  >i</button>
-                  {workerInfo && (
-                    <div className="absolute z-10 top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl text-xs text-slate-600 leading-relaxed">
-                      A Worker account is for individuals who receive tips. You'll get a personal QR code, earnings dashboard, payouts to your bank, and a built-in Tax Pocket to set aside funds for tax season.
-                    </div>
-                  )}
-                </div>
-
-                <div className="relative">
-                  <button
-                    onClick={() => { setError(""); setView("business_signup"); }}
-                    className="w-full flex flex-col items-center gap-2 rounded-2xl border-2 border-slate-200 hover:border-[#0f3f73] hover:bg-[#f0f5ff] transition p-5"
-                  >
-                    <span className="text-3xl">🏢</span>
-                    <span className="font-bold text-slate-900 text-sm">Business</span>
-                    <span className="text-xs text-slate-500 text-center leading-tight">I manage a team</span>
-                  </button>
-                  <button
-                    onClick={() => setBusinessInfo(b => !b)}
-                    className="absolute top-2 right-2 w-5 h-5 rounded-full bg-slate-100 text-slate-400 text-xs font-bold hover:bg-slate-200 flex items-center justify-center"
-                  >i</button>
-                  {businessInfo && (
-                    <div className="absolute z-10 top-full mt-2 left-0 right-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl text-xs text-slate-600 leading-relaxed">
-                      A Business account is for managers and owners who oversee a team of tipped workers. You'll get a team dashboard, combined earnings reports, and worker QR code management.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="relative flex items-center mb-5">
-                <div className="flex-1 border-t border-slate-200" />
-                <span className="px-3 text-xs text-slate-400">or</span>
-                <div className="flex-1 border-t border-slate-200" />
-              </div>
-
-              <button onClick={() => { setError(""); setView("signin"); }} className={btnSecondary}>
-                Sign in to existing account
-              </button>
-            </>
-          )}
-
-          {/* ── WORKER SIGNUP ── */}
-          {view === "worker_signup" && (
-            <>
-              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
-                ← Back
-              </button>
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Worker Account</h2>
-              <p className="text-sm text-slate-500 mb-5">For individuals who receive tips.</p>
-
-              <div className="space-y-3">
-                <input type="text" placeholder="Full name" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClass} />
-                <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
-                <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
-                <input type="tel" placeholder="Phone number (e.g. 4075551234)" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} />
-                <p className="text-xs text-slate-400 text-center">By continuing, you consent to receive a verification SMS. Standard message and data rates may apply.</p>
-              </div>
-
-              {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
-
-              <button onClick={handleWorkerSignup} disabled={loading} className={`${btnPrimary} mt-5`}>
-                {loading ? "Creating account..." : "Create Worker Account"}
-              </button>
-
-              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-400">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                Secure registration — your data is encrypted
-              </p>
-              <button onClick={() => { setError(""); setView("signin"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
-                Already have an account? Sign in
-              </button>
-            </>
-          )}
-
-          {/* ── BUSINESS SIGNUP ── */}
-          {view === "business_signup" && (
-            <>
-              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
-                ← Back
-              </button>
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Business Account</h2>
-              <p className="text-sm text-slate-500 mb-5">For managers and business owners.</p>
-
-              <div className="space-y-3">
-                <input type="text" placeholder="Business name" value={businessName} onChange={e => setBusinessName(e.target.value)} className={inputClass} />
-                <input type="text" placeholder="Your name" value={ownerName} onChange={e => setOwnerName(e.target.value)} className={inputClass} />
-                <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
-                <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
-              </div>
-
-              {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
-
-              <button onClick={handleBusinessSignup} disabled={loading} className={`${btnPrimary} mt-5`}>
-                {loading ? "Creating account..." : "Create Business Account"}
-              </button>
-
-              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-400">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                Secure registration — your data is encrypted
-              </p>
-              <button onClick={() => { setError(""); setView("signin"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
-                Already have an account? Sign in
-              </button>
-            </>
-          )}
-
-          {/* ── SIGN IN ── */}
-          {view === "signin" && (
-            <>
-              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
-                ← Back
-              </button>
-              <h2 className="text-lg font-bold text-slate-900 mb-1">Welcome back</h2>
-              <p className="text-sm text-slate-500 mb-5">Sign in to your Thankly account.</p>
-
-              <div className="space-y-3">
-                <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
-                <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
-              </div>
-
-              <div className="mt-2 text-right">
-                <a href="/auth/reset-password" className="text-xs text-[#0f3f73] hover:underline">Forgot password?</a>
-              </div>
-
-              {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
-
-              <button onClick={handleSignIn} disabled={loading} className={`${btnPrimary} mt-4`}>
-                {loading ? "Signing in..." : "Sign in"}
-              </button>
-
-              <button onClick={() => { setError(""); setView("select"); }} className="mt-3 w-full text-center text-sm text-slate-500 hover:text-slate-700">
-                Don't have an account? Get started
-              </button>
-            </>
-          )}
-
-          {/* ── CHECK EMAIL ── */}
-          {view === "check_email" && (
-            <>
-              <div className="text-center">
-                <div className="text-5xl mb-4">📬</div>
-                <h2 className="text-lg font-bold text-slate-900 mb-2">Check your email</h2>
-                <p className="text-sm text-slate-500 mb-2">A confirmation link has been sent to <strong>{email}</strong>.</p>
-                <p className="text-sm text-slate-500">Tap the link to activate your account. If you don't see it, check your spam or junk folder.</p>
-              </div>
-              <button onClick={() => setView("signin")} className={`${btnSecondary} mt-6`}>
-                Back to sign in
-              </button>
-            </>
-          )}
-
-        {/* Download the app — inside card */}
-          <div className="mt-5 pt-4 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-400 mb-3">Prefer the app? Download Thankly for free.</p>
-            <div className="flex items-center justify-center gap-3">
-              <a href="https://apps.apple.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-black text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-                App Store
-              </a>
-              <a href="https://play.google.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-black text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.3.17.64.24.99.2l12.6-7.28-2.72-2.72-10.87 9.8zm-1.9-20.7C1.1 3.4 1 3.73 1 4.1v15.8c0 .37.1.7.28.99l.1.09 8.85-8.85v-.2L1.38 3.04l-.1.02zM20.1 10.8l-2.54-1.47-3.03 3.03 3.03 3.03 2.56-1.48c.73-.42.73-1.1 0-1.52v-.59zm-18.72 11.4l.09-.05 10.1-5.83-2.72-2.72-7.47 8.6z"/></svg>
-                Google Play
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>    
-    </main>
-    </>
-  );
-}
-</file>
-
-<file path="app/business/create/page.tsx">
-"use client";
-
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import AppNav from "@/components/AppNav";
-
-type Language = "en" | "es";
-type Step = "name" | "account";
-
-export default function CreateBusinessPage() {
-  const [language, setLanguage] = useState<Language>("en");
-  const [step, setStep] = useState<Step>("name");
-  const [businessName, setBusinessName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authChecking, setAuthChecking] = useState(true);
-
-  useEffect(() => {
-    async function checkAuth() {
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-      setAuthChecking(false);
-    }
-    checkAuth();
-  }, []);
-
-  const t = {
-    title: language === "en" ? "Create your business" : "Crea tu negocio",
-    subtitle: language === "en"
-      ? "Set up a business profile to manage team reporting."
-      : "Configura un perfil de negocio para administrar reportes del equipo.",
-    namePlaceholder: language === "en"
-      ? "Business name, e.g. Blue Lagoon"
-      : "Nombre del negocio, ej. Blue Lagoon",
-    next: language === "en" ? "Continue" : "Continuar",
-    createAccount: language === "en" ? "Create account & business" : "Crear cuenta y negocio",
-    createBusiness: language === "en" ? "Create business" : "Crear negocio",
-    loading: language === "en" ? "Creating..." : "Creando...",
-    emailPlaceholder: language === "en" ? "Email address" : "Correo electrónico",
-    passwordPlaceholder: language === "en" ? "Create a password" : "Crea una contraseña",
-    alreadyHaveAccount: language === "en" ? "Already have an account?" : "¿Ya tienes cuenta?",
-    signIn: language === "en" ? "Sign in" : "Inicia sesión",
-    missingName: language === "en" ? "Please enter a business name." : "Ingresa el nombre del negocio.",
-    missingEmail: language === "en" ? "Please enter your email." : "Ingresa tu correo.",
-    missingPassword: language === "en" ? "Please create a password." : "Crea una contraseña.",
-    step1of2: language === "en" ? "Step 1 of 2 — Business info" : "Paso 1 de 2 — Info del negocio",
-    step2of2: language === "en" ? "Step 2 of 2 — Your account" : "Paso 2 de 2 — Tu cuenta",
-  };
-
-  async function handleNameNext() {
-    setErrorMessage("");
-    if (!businessName.trim()) {
-      setErrorMessage(t.missingName);
-      return;
-    }
-    setStep("account");
-  }
-
-  async function createBusiness(userId?: string) {
-    setLoading(true);
-    setErrorMessage("");
-
-    let ownerAuthUserId = userId;
-
-    if (!ownerAuthUserId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      ownerAuthUserId = user?.id;
-    }
-
-    if (!ownerAuthUserId) {
-      setLoading(false);
-      setErrorMessage("Unable to verify your account. Please try again.");
-      return;
-    }
-
-    const response = await fetch("/api/business/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: businessName.trim(),
-        ownerAuthUserId,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      setLoading(false);
-      setErrorMessage(data.error || "Unable to create business.");
-      return;
-    }
-
-    window.location.href = `/business/${data.slug}`;
-  }
-
-  async function handleCreateAccountAndBusiness() {
-    setErrorMessage("");
-
-    if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
-    if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
-
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-
-    if (error) {
-      setLoading(false);
-      setErrorMessage(error.message);
-      return;
-    }
-
-    await createBusiness(data.user?.id);
-  }
-
-  async function handleSignInAndBusiness() {
-    setErrorMessage("");
-
-    if (!email.trim()) { setErrorMessage(t.missingEmail); return; }
-    if (!password.trim()) { setErrorMessage(t.missingPassword); return; }
-
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (error) {
-      setLoading(false);
-      setErrorMessage(error.message);
-      return;
-    }
-
-    await createBusiness(data.user?.id);
-  }
-
-  if (authChecking) {
-    return (
-      <>
-      <AppNav variant="app" />
-      <main className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <p className="text-slate-500 text-sm">Loading...</p>
-      </main>
-      </>
-    );
-  }
-
-  return (
-    <>
-    <AppNav variant="app" />
-    <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
-
-        {/* Header */}
-        <div className="bg-gradient-to-b from-teal-700 to-blue-950 px-6 py-6 text-center">
-          <div className="mb-4 flex justify-center">
-            <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white">
-              <button
-                type="button"
-                onClick={() => setLanguage("en")}
-                className={`rounded-full px-3 py-1 ${language === "en" ? "bg-white text-sky-700" : "text-white/80"}`}
-              >
-                English
-              </button>
-              <button
-                type="button"
-                onClick={() => setLanguage("es")}
-                className={`rounded-full px-3 py-1 ${language === "es" ? "bg-white text-sky-700" : "text-white/80"}`}
-              >
-                Español
-              </button>
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold text-white">{t.title}</h1>
-          <p className="mt-1 text-sm text-white/80">{t.subtitle}</p>
-          <p className="mt-3 text-xs text-white/60">
-            {step === "name" ? t.step1of2 : t.step2of2}
-          </p>
-        </div>
-
-        {/* Step 1 — Business name */}
-        {step === "name" && (
-          <div className="p-6">
-            <input
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              placeholder={t.namePlaceholder}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-              onKeyDown={(e) => e.key === "Enter" && handleNameNext()}
-            />
-
-            {errorMessage ? (
-              <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={handleNameNext}
-              disabled={loading}
-              className="mt-5 w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-            >
-              {loading ? t.loading : t.next}
-            </button>
-          </div>
-        )}
-
-        {/* Step 2 — Account creation (only if not authenticated) */}
-        {step === "account" && (
-          <div className="p-6">
-            <button
-              type="button"
-              onClick={() => { setStep("name"); setErrorMessage(""); }}
-              className="mb-4 text-sm text-slate-400 hover:text-slate-600"
-            >
-              ← {businessName}
-            </button>
-
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={t.emailPlaceholder}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t.passwordPlaceholder}
-              className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-
-            {errorMessage ? (
-              <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={handleCreateAccountAndBusiness}
-              disabled={loading}
-              className="mt-5 w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-            >
-              {loading ? t.loading : t.createAccount}
-            </button>
-
-            <div className="mt-4 flex items-center justify-center gap-1 text-sm text-slate-500">
-              <span>{t.alreadyHaveAccount}</span>
-              <button
-                type="button"
-                onClick={() => window.location.href = "/auth"}
-                disabled={loading}
-                className="font-semibold text-sky-600 hover:underline disabled:opacity-60"
-              >
-                {t.signIn}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </main>
-    </>
-  );
 }
 </file>
 
