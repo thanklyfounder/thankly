@@ -135,6 +135,18 @@ const copy = {
       cta1: 'Get started free',
       cta2: 'Sign in',
     },
+    faq: {
+      eyebrow: 'FAQ',
+      h2: 'Questions, answered.',
+      items: [
+        { q: 'How much does Thankly cost?', a: 'Free to join, no monthly fees. Thankly takes a small platform fee per tip — Founding 500 members lock in 2% for life vs. the 4% standard rate. Customers can choose to cover processing fees so you keep 100% of your tip.' },
+        { q: 'How fast do I get my money?', a: 'Tips land in your Thankly balance in real time. Cash out with an instant payout in minutes, or a free standard payout that arrives in 1–2 business days.' },
+        { q: 'Do I need special hardware?', a: 'No. Your QR code works from your phone screen, a printed card, or a sticker at your station. Customers scan with their phone camera — they don\'t need to download anything to tip you.' },
+        { q: 'Does Thankly withhold my taxes?', a: 'No — the Tax Pocket is an estimation tool, not withholding. Set your estimated rate and Thankly tracks how much of each tip to set aside, plus gives you professional reports for tax season. Thankly doesn\'t provide tax advice.' },
+        { q: 'Is Thankly really bilingual?', a: 'Yes — English and Spanish are built in from the ground up: your dashboard, your public tip page, notifications, everything.' },
+        { q: 'I run a business — can my whole team use it?', a: 'Yes. Create a free business account, share one invite link or QR code, and your team can be live the same shift — with a combined dashboard and exportable team reports.' },
+      ],
+    },
     footer: {
       tagline: 'The bilingual financial platform for tipped hospitality workers. Your tips. Your records. Your money under your control.',
       columns: [
@@ -299,6 +311,18 @@ const copy = {
       sub: 'Únete a Thankly gratis. Sin mensualidades. Sin equipo especial. Solo tu dinero — organizado, registrado y pagado en tus términos.',
       cta1: 'Empieza gratis',
       cta2: 'Inicia sesión',
+    },
+    faq: {
+      eyebrow: 'Preguntas frecuentes',
+      h2: 'Tus dudas, resueltas.',
+      items: [
+        { q: '¿Cuánto cuesta Thankly?', a: 'Unirte es gratis y no hay mensualidades. Thankly cobra una pequeña tarifa de plataforma por propina — los miembros del Founding 500 aseguran el 2% de por vida vs. la tarifa estándar del 4%. Tus clientes pueden cubrir la tarifa de procesamiento para que recibas el 100% de tu propina.' },
+        { q: '¿Qué tan rápido recibo mi dinero?', a: 'Las propinas llegan a tu saldo de Thankly en tiempo real. Retira al instante en minutos, o con un retiro estándar gratis que llega en 1–2 días hábiles.' },
+        { q: '¿Necesito equipo especial?', a: 'No. Tu código QR funciona desde la pantalla de tu teléfono, una tarjeta impresa o una calcomanía en tu estación. Tus clientes escanean con la cámara de su teléfono — no necesitan descargar nada para darte propina.' },
+        { q: '¿Thankly retiene mis impuestos?', a: 'No — el Tax Pocket es una herramienta de estimación, no una retención. Define tu tasa estimada y Thankly calcula cuánto apartar de cada propina, además de darte reportes profesionales para la temporada de impuestos. Thankly no ofrece asesoría fiscal.' },
+        { q: '¿Thankly es realmente bilingüe?', a: 'Sí — inglés y español están integrados desde cero: tu panel, tu página pública de propinas, tus notificaciones, todo.' },
+        { q: 'Tengo un negocio — ¿puede usarlo todo mi equipo?', a: 'Sí. Crea una cuenta de negocio gratis, comparte un enlace o código QR de invitación, y tu equipo puede estar activo el mismo turno — con panel combinado y reportes de equipo exportables.' },
+      ],
     },
     footer: {
       tagline: 'La plataforma financiera bilingüe para trabajadores de hospitalidad que reciben propinas. Tus propinas. Tus registros. Tu dinero bajo tu control.',
@@ -538,7 +562,7 @@ export default function HomePage() {
       <section className="bg-[#F0F6FF] py-24 px-[5%]" id="how-it-works">
         <div className="max-w-[1200px] mx-auto">
           <div className="text-center mb-16 fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">{c.how.eyebrow}</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.how.eyebrow}</p>
             <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight mb-4">{c.how.h2}</h2>
             <p className="text-[#4A5568] text-lg leading-relaxed max-w-xl mx-auto">{c.how.sub}</p>
           </div>
@@ -564,7 +588,7 @@ export default function HomePage() {
       <section className="py-24 px-[5%]" id="features">
         <div className="max-w-[1200px] mx-auto">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700 mb-14">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">{c.features.eyebrow}</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.features.eyebrow}</p>
             <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight">{c.features.h2a}<br />{c.features.h2b}</h2>
           </div>
 
@@ -589,7 +613,7 @@ export default function HomePage() {
         <div className="absolute top-[-50%] right-[-20%] w-[700px] h-[700px] bg-[#00B4D8]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-20 items-center relative z-10">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">{c.bilingual.eyebrow}</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.bilingual.eyebrow}</p>
             <h2 className="text-4xl font-black text-white tracking-tight leading-tight mb-6">{c.bilingual.h2a}<br />{c.bilingual.h2b}</h2>
             <p className="text-white/70 text-lg leading-relaxed mb-8">
               {c.bilingual.sub}
@@ -618,7 +642,7 @@ export default function HomePage() {
       <section className="bg-[#F0F6FF] py-24 px-[5%]" id="founding">
         <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-20 items-center">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">{c.founding.eyebrow}</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.founding.eyebrow}</p>
             <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight leading-tight mb-6">{c.founding.h2a}<br />{c.founding.h2b}</h2>
             <p className="text-[#4A5568] text-lg leading-relaxed mb-8">{c.founding.sub}</p>
 
@@ -655,7 +679,7 @@ export default function HomePage() {
       <section className="py-24 px-[5%]" id="business">
         <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-20 items-center">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">{c.business.eyebrow}</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.business.eyebrow}</p>
             <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight leading-tight mb-4">{c.business.h2a}<br />{c.business.h2b}</h2>
             <p className="text-[#4A5568] text-lg leading-relaxed mb-8">{c.business.sub}</p>
 
@@ -708,6 +732,27 @@ export default function HomePage() {
               <div className="bg-[#1B3A6B] text-white text-center py-2.5 rounded-xl text-xs font-bold">{c.business.report.exportPdf}</div>
               <div className="border border-[#1B3A6B] text-[#1B3A6B] text-center py-2.5 rounded-xl text-xs font-bold">{c.business.report.exportExcel}</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="bg-[#F0F6FF] py-24 px-[5%]" id="faq">
+        <div className="max-w-[860px] mx-auto">
+          <div className="text-center mb-12 fade-up opacity-0 translate-y-6 transition-all duration-700">
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.faq.eyebrow}</p>
+            <h2 className="text-4xl md:text-5xl font-black text-[#0D1B2A] tracking-tight">{c.faq.h2}</h2>
+          </div>
+          <div className="flex flex-col gap-3">
+            {c.faq.items.map((item, i) => (
+              <details key={i} className="group bg-white border border-slate-200 rounded-2xl px-6 py-5 open:border-[#00B4D8] transition-colors fade-up opacity-0 translate-y-6 duration-700">
+                <summary className="flex items-center justify-between cursor-pointer list-none font-bold text-[#0D1B2A] [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <span className="text-[#00B4D8] text-2xl font-light leading-none group-open:rotate-45 transition-transform flex-shrink-0 ml-4">+</span>
+                </summary>
+                <p className="text-sm text-[#4A5568] leading-relaxed mt-3 pr-8">{item.a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>

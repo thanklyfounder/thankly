@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase-server";
 import BusinessInviteCard from "@/components/BusinessInviteCard";
 import BusinessExportButton from "@/components/BusinessExportButton";
@@ -18,6 +18,14 @@ export default async function BusinessDashboardPage({ params }: PageProps) {
 
   const supabase = await createServerClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth");
+  }
+
   const { data: business, error: businessError } = await supabase
     .from("businesses")
     .select("*")
@@ -25,6 +33,10 @@ export default async function BusinessDashboardPage({ params }: PageProps) {
     .single();
 
   if (businessError || !business) {
+    notFound();
+  }
+
+  if (business.owner_auth_user_id !== user.id) {
     notFound();
   }
 
