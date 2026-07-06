@@ -18,6 +18,14 @@ function AuthContent() {
     if (intent === "signin") {
       setView("signin");
       sessionStorage.removeItem("authView");
+      return;
+    }
+
+    const role = new URLSearchParams(window.location.search).get("role");
+    if (role === "business") {
+      setView("business_signup");
+    } else if (role === "worker") {
+      setView("worker_signup");
     }
   }, []);
   // Shared

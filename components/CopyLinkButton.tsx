@@ -24,7 +24,7 @@ export default function CopyLinkButton({
     <button
       type="button"
       onClick={handleCopy}
-      className="mt-3 rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition"
+      className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition"
     >
       {copied
         ? language === "es"
