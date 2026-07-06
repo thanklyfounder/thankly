@@ -99,28 +99,33 @@ function AuthContent() {
     if (!email.trim() || !password) return setError("Enter your email and password.");
 
     setLoading(true);
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setLoading(false);
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (signInError) {
-      setError("Incorrect email or password. Please try again.");
-      return;
-    }
+      if (signInError) {
+        setError("Incorrect email or password. Please try again.");
+        return;
+      }
 
-    // Route based on whether they have a worker record
-    const { data: worker } = await supabase
-      .from("workers")
-      .select("profile_slug")
-      .eq("auth_user_id", data.user.id)
-      .single();
+      const { data: worker } = await supabase
+        .from("workers")
+        .select("profile_slug")
+        .eq("auth_user_id", data.user.id)
+        .maybeSingle();
 
-    if (worker?.profile_slug) {
-      router.push("/manage");
-    } else {
-      router.push("/create");
+      if (worker?.profile_slug) {
+        router.push("/manage");
+      } else {
+        router.push("/create");
+      }
+    } catch (err) {
+      console.error("Sign in error:", err);
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
