@@ -6,6 +6,7 @@ import EditWorkerProfile from "@/components/EditWorkerProfile";
 import ResumeStripeButton from "@/components/ResumeStripeButton";
 import TaxWithholdingCard from "@/components/TaxWithholdingCard";
 import ExportEarningsButton from "@/components/ExportEarningsButton";
+import WebPayoutCard from "@/components/WebPayoutCard";
 import AppNav from "@/components/AppNav";
 
 type Filter = "today" | "week" | "month" | "all" | "custom";
@@ -488,6 +489,11 @@ export default function ManageDashboardClient({
             <p className="mt-1 text-xs text-slate-600">{t.perCustomer}</p>
           </div>
         </section>
+
+        <WebPayoutCard
+          stripeOnboarded={worker.stripe_onboarded}
+          language={language}
+        />
 
         <TaxWithholdingCard
           workerId={worker.id}

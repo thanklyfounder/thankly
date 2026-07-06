@@ -62,6 +62,7 @@ app/api/mobile/shift/start/route.ts
 app/api/stripe/webhook/route.ts
 app/api/update-tax-settings/route.ts
 app/api/update-worker-profile/route.ts
+app/api/web/initiate-payout/route.ts
 app/auth/confirm/page.tsx
 app/auth/page.tsx
 app/auth/reset-password/page.tsx
@@ -97,6 +98,7 @@ components/ShareMomentButton.tsx
 components/ShareQrCard.tsx
 components/SuccessFeedbackCard.tsx
 components/TaxWithholdingCard.tsx
+components/WebPayoutCard.tsx
 eslint.config.mjs
 lib/sendPushNotification.ts
 lib/stripe.ts
@@ -1015,6 +1017,191 @@ export async function POST(req: NextRequest) {
     console.error("Tax settings route error:", error);
     return NextResponse.json(
       { error: "Unexpected error" },
+      { status: 500 }
+    );
+  }
+}
+</file>
+
+<file path="app/api/web/initiate-payout/route.ts">
+// app/api/web/initiate-payout/route.ts
+// Web version of /api/mobile/initiate-payout.
+// Identity comes from the cookie session (createServerClient → getUser) — never from the request body.
+// GET  = fetch Stripe balance for the signed-in worker (used by WebPayoutCard)
+// POST = initiate a payout ({ method: "standard" | "instant" })
+
+import { NextRequest, NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
+import { createServerClient } from "@/lib/supabase-server";
+import { sendPushNotification } from "@/lib/sendPushNotification";
+
+const IS_SANDBOX = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ?? false;
+
+// Same mock shape as /api/mobile/get-stripe-balance for sandbox parity
+const SANDBOX_MOCK_BALANCE = {
+  available: [{ amount: 18650, currency: "usd" }],
+  pending: [{ amount: 7400, currency: "usd" }],
+};
+
+function formatDollars(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+async function getAuthedWorker() {
+  const supabase = await createServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { worker: null, errorResponse: NextResponse.json({ error: "Not authenticated." }, { status: 401 }) };
+  }
+
+  const { data: worker, error } = await supabase
+    .from("workers")
+    .select("id, stripe_account_id, stripe_onboarded, expo_push_token, notify_payouts")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (error || !worker) {
+    return { worker: null, errorResponse: NextResponse.json({ error: "Worker not found." }, { status: 404 }) };
+  }
+
+  return { worker, errorResponse: null };
+}
+
+export async function GET() {
+  try {
+    const { worker, errorResponse } = await getAuthedWorker();
+    if (!worker) return errorResponse;
+
+    if (!worker.stripe_account_id) {
+      return NextResponse.json({ error: "Stripe account not found." }, { status: 404 });
+    }
+
+    if (IS_SANDBOX) {
+      return NextResponse.json(SANDBOX_MOCK_BALANCE);
+    }
+
+    const balance = await stripe.balance.retrieve(
+      {},
+      { stripeAccount: worker.stripe_account_id }
+    );
+
+    return NextResponse.json({
+      available: balance.available,
+      pending: balance.pending,
+    });
+  } catch (error) {
+    console.error("Web balance fetch error:", error);
+    return NextResponse.json({ error: "Unable to fetch Stripe balance." }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { worker, errorResponse } = await getAuthedWorker();
+    if (!worker) return errorResponse;
+
+    const body = await req.json();
+    const method = body?.method;
+
+    if (!method || !["standard", "instant"].includes(method)) {
+      return NextResponse.json(
+        { error: "Invalid method. Must be 'standard' or 'instant'." },
+        { status: 400 }
+      );
+    }
+
+    if (!worker.stripe_account_id || !worker.stripe_onboarded) {
+      return NextResponse.json(
+        { error: "Stripe account not connected or not fully onboarded." },
+        { status: 400 }
+      );
+    }
+
+    if (IS_SANDBOX) {
+      return NextResponse.json({
+        success: true,
+        payoutId: "po_sandbox_simulated",
+        amount: 18650,
+        method,
+        arrivalDate: Math.floor(Date.now() / 1000) + (method === "instant" ? 60 : 172800),
+        status: "paid",
+        sandbox: true,
+      });
+    }
+
+    const balance = await stripe.balance.retrieve(
+      {},
+      { stripeAccount: worker.stripe_account_id }
+    );
+
+    const availableUSD = balance.available.find((b) => b.currency === "usd");
+    const availableAmount = availableUSD?.amount ?? 0;
+
+    if (availableAmount <= 0) {
+      return NextResponse.json(
+        { error: "No available balance to pay out." },
+        { status: 400 }
+      );
+    }
+
+    const externalAccounts = await stripe.accounts.listExternalAccounts(
+      worker.stripe_account_id,
+      { object: method === "instant" ? "card" : "bank_account", limit: 1 }
+    );
+
+    if (externalAccounts.data.length === 0) {
+      const missingType = method === "instant" ? "debit card" : "bank account";
+      return NextResponse.json(
+        { error: `No ${missingType} found on this Stripe account.` },
+        { status: 400 }
+      );
+    }
+
+    const destinationId = externalAccounts.data[0].id;
+
+    const payout = await stripe.payouts.create(
+      {
+        amount: availableAmount,
+        currency: "usd",
+        method,
+        destination: destinationId,
+        description: `Thankly ${method} payout`,
+      },
+      {
+        stripeAccount: worker.stripe_account_id,
+      }
+    );
+
+    if (worker.expo_push_token && worker.notify_payouts !== false) {
+      await sendPushNotification({
+        expoPushToken: worker.expo_push_token,
+        title: "💸 Payout initiated",
+        body: `${formatDollars(payout.amount)} is on its way. Estimated arrival: ${method === "instant" ? "within minutes" : "1–2 business days"}.`,
+        data: { screen: "payouts" },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      payoutId: payout.id,
+      amount: payout.amount,
+      method: payout.method,
+      arrivalDate: payout.arrival_date,
+      status: payout.status,
+    });
+  } catch (error: any) {
+    console.error("Web initiate payout error:", error);
+
+    if (error?.type === "StripeInvalidRequestError") {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(
+      { error: "Unexpected error initiating payout." },
       { status: 500 }
     );
   }
@@ -3188,6 +3375,239 @@ export default function TaxWithholdingCard({
             {message}
           </p>
         ) : null}
+      </div>
+    </section>
+  );
+}
+</file>
+
+<file path="components/WebPayoutCard.tsx">
+"use client";
+
+// components/WebPayoutCard.tsx
+// Payout card for the web dashboard. Fetches balance and initiates payouts
+// via /api/web/initiate-payout (cookie-session authenticated — no authUserId sent).
+
+import { useEffect, useState } from "react";
+
+type Language = "en" | "es";
+type PayoutMethod = "standard" | "instant";
+
+type Props = {
+  stripeOnboarded: boolean;
+  language?: Language;
+};
+
+function formatDollars(cents: number | null | undefined) {
+  return `$${((cents ?? 0) / 100).toFixed(2)}`;
+}
+
+export default function WebPayoutCard({ stripeOnboarded, language = "en" }: Props) {
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [pendingBalance, setPendingBalance] = useState(0);
+  const [loadingBalance, setLoadingBalance] = useState(true);
+  const [initiating, setInitiating] = useState(false);
+  const [method, setMethod] = useState<PayoutMethod>("standard");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const t = {
+    title: language === "en" ? "Payouts" : "Pagos",
+
+    subtitle:
+      language === "en"
+        ? "Transfer your available balance to your bank or debit card."
+        : "Transfiere tu saldo disponible a tu banco o tarjeta de débito.",
+
+    available:
+      language === "en" ? "Available for payout" : "Disponible para retirar",
+
+    pending: language === "en" ? "Pending" : "Pendiente",
+
+    standard: language === "en" ? "Standard" : "Estándar",
+
+    standardSub:
+      language === "en" ? "1–2 business days · Free" : "1–2 días hábiles · Gratis",
+
+    instant: language === "en" ? "Instant" : "Instantáneo",
+
+    instantSub:
+      language === "en"
+        ? "Within minutes · Stripe fee applies"
+        : "En minutos · Aplica cargo de Stripe",
+
+    initiate: language === "en" ? "Initiate Payout" : "Iniciar retiro",
+
+    processing: language === "en" ? "Processing..." : "Procesando...",
+
+    connectFirst:
+      language === "en"
+        ? "Finish Stripe setup to enable payouts."
+        : "Completa la configuración de Stripe para activar los retiros.",
+
+    noBalance:
+      language === "en"
+        ? "No available balance to pay out yet."
+        : "Aún no tienes saldo disponible para retirar.",
+
+    confirmText: (amount: string) =>
+      language === "en"
+        ? `Initiate a ${method} payout of ${amount}?`
+        : `¿Iniciar un retiro ${method === "instant" ? "instantáneo" : "estándar"} de ${amount}?`,
+
+    successText: (amount: string) =>
+      language === "en"
+        ? `${amount} is on its way. Estimated arrival: ${
+            method === "instant" ? "within minutes" : "1–2 business days"
+          }.`
+        : `${amount} está en camino. Llegada estimada: ${
+            method === "instant" ? "en minutos" : "1–2 días hábiles"
+          }.`,
+
+    errorGeneric:
+      language === "en"
+        ? "Something went wrong. Please try again."
+        : "Algo salió mal. Inténtalo de nuevo.",
+  };
+
+  async function loadBalance() {
+    try {
+      setLoadingBalance(true);
+      const response = await fetch("/api/web/initiate-payout");
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      setAvailableBalance(data.available?.[0]?.amount ?? 0);
+      setPendingBalance(data.pending?.[0]?.amount ?? 0);
+    } catch (error) {
+      console.error("Balance load error:", error);
+    } finally {
+      setLoadingBalance(false);
+    }
+  }
+
+  useEffect(() => {
+    if (stripeOnboarded) {
+      loadBalance();
+    } else {
+      setLoadingBalance(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripeOnboarded]);
+
+  async function handleInitiatePayout() {
+    setMessage(null);
+
+    if (!window.confirm(t.confirmText(formatDollars(availableBalance)))) {
+      return;
+    }
+
+    try {
+      setInitiating(true);
+
+      const response = await fetch("/api/web/initiate-payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: "error", text: data.error ?? t.errorGeneric });
+        return;
+      }
+
+      setMessage({ type: "success", text: t.successText(formatDollars(data.amount)) });
+      await loadBalance();
+    } catch (error) {
+      console.error("Initiate payout error:", error);
+      setMessage({ type: "error", text: t.errorGeneric });
+    } finally {
+      setInitiating(false);
+    }
+  }
+
+  const canPayout = stripeOnboarded && availableBalance > 0 && !initiating;
+
+  return (
+    <section className="rounded-3xl bg-white p-6 shadow-xl">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
+          <p className="text-sm text-slate-500">{t.subtitle}</p>
+
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t.available}
+          </p>
+          <p className="mt-1 text-4xl font-bold text-slate-900">
+            {loadingBalance ? "—" : formatDollars(availableBalance)}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            {t.pending}: {loadingBalance ? "—" : formatDollars(pendingBalance)}
+          </p>
+        </div>
+
+        <div className="w-full md:w-72">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setMethod("standard")}
+              className={`rounded-2xl border px-4 py-3 text-left transition ${
+                method === "standard"
+                  ? "border-sky-600 bg-sky-50"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}
+            >
+              <p className="text-sm font-bold text-slate-900">{t.standard}</p>
+              <p className="mt-1 text-xs text-slate-600">{t.standardSub}</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMethod("instant")}
+              className={`rounded-2xl border px-4 py-3 text-left transition ${
+                method === "instant"
+                  ? "border-sky-600 bg-sky-50"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}
+            >
+              <p className="text-sm font-bold text-slate-900">{t.instant}</p>
+              <p className="mt-1 text-xs text-slate-600">{t.instantSub}</p>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleInitiatePayout}
+            disabled={!canPayout}
+            className={`mt-3 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+              canPayout
+                ? "bg-sky-600 text-white hover:bg-sky-700"
+                : "cursor-not-allowed bg-slate-200 text-slate-500"
+            }`}
+          >
+            {initiating ? t.processing : t.initiate}
+          </button>
+
+          {!stripeOnboarded && (
+            <p className="mt-2 text-xs text-amber-700">{t.connectFirst}</p>
+          )}
+
+          {stripeOnboarded && !loadingBalance && availableBalance <= 0 && (
+            <p className="mt-2 text-xs text-slate-500">{t.noBalance}</p>
+          )}
+
+          {message && (
+            <p
+              className={`mt-2 text-xs font-semibold ${
+                message.type === "success" ? "text-emerald-700" : "text-red-600"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -7035,179 +7455,6 @@ export default function EditWorkerProfile({
               {message}
             </p>
           ) : null}
-        </div>
-      </div>
-    </section>
-  );
-}
-</file>
-
-<file path="components/ShareQrCard.tsx">
-"use client";
-
-import QRCode from "react-qr-code";
-import { useRef, useState } from "react";
-import CopyLinkButton from "@/components/CopyLinkButton";
-
-type Language = "en" | "es";
-
-type ShareQrCardProps = {
-  publicUrl: string;
-  workerName?: string;
-  language?: Language;
-};
-
-export default function ShareQrCard({
-  publicUrl,
-  workerName = "Thankly Worker",
-  language = "en",
-}: ShareQrCardProps) {
-  const qrRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
-
-  const t = {
-    title: language === "en" ? "Share your page" : "Comparte tu QR",
-    description:
-      language === "en"
-        ? "Copy your link, open your page, or download your QR code."
-        : "Copia tu enlace, abre tu página o descarga tu código QR.",
-    publicLink: language === "en" ? "Public Link" : "Enlace público",
-    openPage: language === "en" ? "View Tip Page" : "Ver página de propinas",
-    downloadQr: language === "en" ? "Download QR" : "Descargar QR",
-    share: language === "en" ? "Share" : "Compartir",
-    copied: language === "en" ? "Copied!" : "¡Copiado!",
-    shareTitle:
-      language === "en"
-        ? "My Thankly page"
-        : "Mi página de Thankly",
-    shareText:
-      language === "en"
-        ? "Show your appreciation on Thankly"
-        : "Muestra tu agradecimiento en Thankly",
-  };
-
-  function downloadSvg() {
-    const svg = qrRef.current?.querySelector("svg");
-
-    if (!svg) {
-      alert("QR code not ready yet.");
-      return;
-    }
-
-    const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
-
-    const blob = new Blob([source], {
-      type: "image/svg+xml;charset=utf-8",
-    });
-
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "thankly-qr-code.svg";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(url);
-  }
-
-  async function shareLink() {
-    try {
-      const card = qrRef.current;
-      if (!card) return;
-
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(card, { backgroundColor: "#0f3f73", scale: 2 });
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        if (navigator.share && navigator.canShare?.({ files: [new File([blob], "thankly-qr.png", { type: "image/png" })] })) {
-          await navigator.share({
-            title: t.shareTitle,
-            text: t.shareText,
-            files: [new File([blob], "thankly-qr.png", { type: "image/png" })],
-          });
-        } else {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "thankly-qr.png";
-          a.click();
-          URL.revokeObjectURL(url);
-        }
-      }, "image/png");
-    } catch {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
-  return (
-    <section className="rounded-3xl bg-white p-6 shadow-xl">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{t.description}</p>
-      </div>
-
-      <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_220px] lg:items-center">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-wide text-slate-400">
-            {t.publicLink}
-          </p>
-
-          <p className="mt-1 break-all text-lg font-semibold text-slate-900">
-            {publicUrl}
-          </p>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <CopyLinkButton 
-              value={publicUrl}
-              language={language}
-            />
-
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-2xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
-            >
-              {t.openPage}
-            </a>
-
-            <button
-              type="button"
-              onClick={downloadSvg}
-              className="rounded-2xl border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
-            >
-              {t.downloadQr}
-            </button>
-
-            <button
-              type="button"
-              onClick={shareLink}
-              className="rounded-2xl border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 transition"
-            >
-              {copied ? t.copied : t.share}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex justify-center">
-          <div
-            ref={qrRef}
-            className="rounded-2xl overflow-hidden"
-            style={{ background: "#0f3f73", padding: "24px", textAlign: "center", width: "220px" }}
-          >
-            <p style={{ color: "#ffffff", fontWeight: 900, fontSize: "18px", margin: "0 0 4px", letterSpacing: "0.5px" }}>Thankly</p>
-            <p style={{ color: "#bfdbfe", fontSize: "11px", margin: "0 0 14px" }}>Worker Finance Platform</p>
-            <div style={{ background: "#ffffff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
-              <QRCode value={publicUrl} size={160} />
-            </div>
-            <p style={{ color: "#ffffff", fontSize: "12px", fontWeight: 700, margin: "12px 0 2px" }}>{workerName}</p>
-            <p style={{ color: "#93c5fd", fontSize: "10px", margin: "0" }}>getthankly.com</p>
-          </div>
         </div>
       </div>
     </section>
@@ -22188,6 +22435,270 @@ export default function ManageDashboardClient({
 }
 </file>
 
+<file path="components/ShareQrCard.tsx">
+"use client";
+
+import QRCode from "react-qr-code";
+import { useRef, useState } from "react";
+import CopyLinkButton from "@/components/CopyLinkButton";
+
+type Language = "en" | "es";
+
+type ShareQrCardProps = {
+  publicUrl: string;
+  workerName?: string;
+  language?: Language;
+};
+
+export default function ShareQrCard({
+  publicUrl,
+  workerName = "Thankly Worker",
+  language = "en",
+}: ShareQrCardProps) {
+  const qrRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const t = {
+    title: language === "en" ? "Share your page" : "Comparte tu QR",
+    description:
+      language === "en"
+        ? "Copy your link, open your page, or download your QR code."
+        : "Copia tu enlace, abre tu página o descarga tu código QR.",
+    publicLink: language === "en" ? "Public Link" : "Enlace público",
+    openPage: language === "en" ? "View Tip Page" : "Ver página de propinas",
+    downloadQr: language === "en" ? "Download QR" : "Descargar QR",
+    share: language === "en" ? "Share" : "Compartir",
+    copied: language === "en" ? "Copied!" : "¡Copiado!",
+    linkHint:
+      language === "en"
+        ? "This link opens your public tip page — share it anywhere your customers can tap or scan."
+        : "Este enlace abre tu página pública de propinas — compártelo donde tus clientes puedan verlo.",
+    shareTitle:
+      language === "en"
+        ? "My Thankly page"
+        : "Mi página de Thankly",
+    shareText:
+      language === "en"
+        ? "Show your appreciation on Thankly"
+        : "Muestra tu agradecimiento en Thankly",
+  };
+
+  async function renderBrandedCardPng(): Promise<Blob | null> {
+    const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return null;
+
+    // Clone with explicit dimensions so the SVG has an intrinsic size
+    // when rasterized (Firefox requires this for drawImage).
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute("width", "160");
+    clone.setAttribute("height", "160");
+
+    const svgData = new XMLSerializer().serializeToString(clone);
+    const svgUrl =
+      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
+
+    const qrImage = new Image();
+    await new Promise<void>((resolve, reject) => {
+      qrImage.onload = () => resolve();
+      qrImage.onerror = () => reject(new Error("QR image failed to load"));
+      qrImage.src = svgUrl;
+    });
+
+    // Layout in logical px matching the on-screen 220px card, scaled 3x for export quality.
+    const S = 3;
+    const W = 220;
+    const H = 320;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W * S;
+    canvas.height = H * S;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.scale(S, S);
+
+    function roundedRect(x: number, y: number, w: number, h: number, r: number) {
+      ctx!.beginPath();
+      ctx!.moveTo(x + r, y);
+      ctx!.arcTo(x + w, y, x + w, y + h, r);
+      ctx!.arcTo(x + w, y + h, x, y + h, r);
+      ctx!.arcTo(x, y + h, x, y, r);
+      ctx!.arcTo(x, y, x + w, y, r);
+      ctx!.closePath();
+    }
+
+    // Navy card background
+    roundedRect(0, 0, W, H, 16);
+    ctx.fillStyle = "#0f3f73";
+    ctx.fill();
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+
+    // Wordmark
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 18px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("Thankly", W / 2, 24);
+
+    // Subtitle
+    ctx.fillStyle = "#bfdbfe";
+    ctx.font = "400 11px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("Worker Finance Platform", W / 2, 48);
+
+    // White QR panel
+    const panelSize = 184;
+    const panelX = (W - panelSize) / 2;
+    const panelY = 71;
+    roundedRect(panelX, panelY, panelSize, panelSize, 12);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+
+    // QR code
+    ctx.drawImage(qrImage, panelX + 12, panelY + 12, 160, 160);
+
+    // Worker name
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 12px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText(workerName, W / 2, panelY + panelSize + 12);
+
+    // Domain
+    ctx.fillStyle = "#93c5fd";
+    ctx.font = "400 10px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("getthankly.com", W / 2, panelY + panelSize + 30);
+
+    return new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((blob) => resolve(blob), "image/png")
+    );
+  }
+
+  async function downloadQrCard() {
+    try {
+      const blob = await renderBrandedCardPng();
+
+      if (!blob) {
+        alert("QR code not ready yet.");
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "thankly-qr-card.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("QR download error:", error);
+      alert("Could not generate the QR card. Please try again.");
+    }
+  }
+
+  async function shareCard() {
+    try {
+      const blob = await renderBrandedCardPng();
+      if (!blob) return;
+
+      const file = new File([blob], "thankly-qr-card.png", { type: "image/png" });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: t.shareTitle,
+          text: t.shareText,
+          files: [file],
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "thankly-qr-card.png";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      // User cancelling the native share sheet is not an error
+      if ((error as any)?.name === "AbortError") return;
+
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  return (
+    <section className="rounded-3xl bg-white p-6 shadow-xl">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{t.description}</p>
+      </div>
+
+      <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_220px] lg:items-center">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs uppercase tracking-wide text-slate-400">
+            {t.publicLink}
+          </p>
+
+          <p className="mt-1 break-all text-lg font-semibold text-slate-900">
+            {publicUrl}
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <CopyLinkButton 
+              value={publicUrl}
+              language={language}
+            />
+
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-2xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
+            >
+              {t.openPage}
+            </a>
+
+            <button
+              type="button"
+              onClick={downloadQrCard}
+              className="rounded-2xl border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
+            >
+              {t.downloadQr}
+            </button>
+
+            <button
+              type="button"
+              onClick={shareCard}
+              className="rounded-2xl border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 transition"
+            >
+              {copied ? t.copied : t.share}
+            </button>
+          </div>
+
+          <p className="mt-3 text-xs text-slate-400">{t.linkHint}</p>
+        </div>
+
+        <div className="flex justify-center">
+          <div
+            ref={qrRef}
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "#0f3f73", padding: "24px", textAlign: "center", width: "220px" }}
+          >
+            <p style={{ color: "#ffffff", fontWeight: 900, fontSize: "18px", margin: "0 0 4px", letterSpacing: "0.5px" }}>Thankly</p>
+            <p style={{ color: "#bfdbfe", fontSize: "11px", margin: "0 0 14px" }}>Worker Finance Platform</p>
+            <div style={{ background: "#ffffff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
+              <QRCode value={publicUrl} size={160} />
+            </div>
+            <p style={{ color: "#ffffff", fontSize: "12px", fontWeight: 700, margin: "12px 0 2px" }}>{workerName}</p>
+            <p style={{ color: "#93c5fd", fontSize: "10px", margin: "0" }}>getthankly.com</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+</file>
+
 <file path="lib/supabase-server.ts">
 import { createServerClient as createSSRClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -29871,46 +30382,6 @@ export default function CreatePage() {
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "thankly",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.15.0",
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.99.2",
-    "exceljs": "^4.4.0",
-    "file-saver": "^2.0.5",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.7",
-    "next": "16.1.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-qr-code": "^2.0.18",
-    "stripe": "^22.0.0"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/file-saver": "^2.0.7",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
-}
-</file>
-
 <file path="thankly-mobile/app/auth.tsx">
 import { useState } from "react";
 import {
@@ -30339,6 +30810,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
 });
+</file>
+
+<file path="package.json">
+{
+  "name": "thankly",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.99.2",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-qr-code": "^2.0.18",
+    "stripe": "^22.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
 </file>
 
 <file path="app/business/create/page.tsx">
