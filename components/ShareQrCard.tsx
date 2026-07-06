@@ -31,6 +31,10 @@ export default function ShareQrCard({
     downloadQr: language === "en" ? "Download QR" : "Descargar QR",
     share: language === "en" ? "Share" : "Compartir",
     copied: language === "en" ? "Copied!" : "¡Copiado!",
+    linkHint:
+      language === "en"
+        ? "This link opens your public tip page — share it anywhere your customers can tap or scan."
+        : "Este enlace abre tu página pública de propinas — compártelo donde tus clientes puedan verlo.",
     shareTitle:
       language === "en"
         ? "My Thankly page"
@@ -41,58 +45,143 @@ export default function ShareQrCard({
         : "Muestra tu agradecimiento en Thankly",
   };
 
-  function downloadSvg() {
+  async function renderBrandedCardPng(): Promise<Blob | null> {
     const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return null;
 
-    if (!svg) {
-      alert("QR code not ready yet.");
-      return;
-    }
+    // Clone with explicit dimensions so the SVG has an intrinsic size
+    // when rasterized (Firefox requires this for drawImage).
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute("width", "160");
+    clone.setAttribute("height", "160");
 
-    const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
+    const svgData = new XMLSerializer().serializeToString(clone);
+    const svgUrl =
+      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
 
-    const blob = new Blob([source], {
-      type: "image/svg+xml;charset=utf-8",
+    const qrImage = new Image();
+    await new Promise<void>((resolve, reject) => {
+      qrImage.onload = () => resolve();
+      qrImage.onerror = () => reject(new Error("QR image failed to load"));
+      qrImage.src = svgUrl;
     });
 
-    const url = URL.createObjectURL(blob);
+    // Layout in logical px matching the on-screen 220px card, scaled 3x for export quality.
+    const S = 3;
+    const W = 220;
+    const H = 320;
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "thankly-qr-code.svg";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const canvas = document.createElement("canvas");
+    canvas.width = W * S;
+    canvas.height = H * S;
 
-    URL.revokeObjectURL(url);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.scale(S, S);
+
+    function roundedRect(x: number, y: number, w: number, h: number, r: number) {
+      ctx!.beginPath();
+      ctx!.moveTo(x + r, y);
+      ctx!.arcTo(x + w, y, x + w, y + h, r);
+      ctx!.arcTo(x + w, y + h, x, y + h, r);
+      ctx!.arcTo(x, y + h, x, y, r);
+      ctx!.arcTo(x, y, x + w, y, r);
+      ctx!.closePath();
+    }
+
+    // Navy card background
+    roundedRect(0, 0, W, H, 16);
+    ctx.fillStyle = "#0f3f73";
+    ctx.fill();
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+
+    // Wordmark
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 18px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("Thankly", W / 2, 24);
+
+    // Subtitle
+    ctx.fillStyle = "#bfdbfe";
+    ctx.font = "400 11px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("Worker Finance Platform", W / 2, 48);
+
+    // White QR panel
+    const panelSize = 184;
+    const panelX = (W - panelSize) / 2;
+    const panelY = 71;
+    roundedRect(panelX, panelY, panelSize, panelSize, 12);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+
+    // QR code
+    ctx.drawImage(qrImage, panelX + 12, panelY + 12, 160, 160);
+
+    // Worker name
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 12px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText(workerName, W / 2, panelY + panelSize + 12);
+
+    // Domain
+    ctx.fillStyle = "#93c5fd";
+    ctx.font = "400 10px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("getthankly.com", W / 2, panelY + panelSize + 30);
+
+    return new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((blob) => resolve(blob), "image/png")
+    );
   }
 
-  async function shareLink() {
+  async function downloadQrCard() {
     try {
-      const card = qrRef.current;
-      if (!card) return;
+      const blob = await renderBrandedCardPng();
 
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(card, { backgroundColor: "#0f3f73", scale: 2 });
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        if (navigator.share && navigator.canShare?.({ files: [new File([blob], "thankly-qr.png", { type: "image/png" })] })) {
-          await navigator.share({
-            title: t.shareTitle,
-            text: t.shareText,
-            files: [new File([blob], "thankly-qr.png", { type: "image/png" })],
-          });
-        } else {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "thankly-qr.png";
-          a.click();
-          URL.revokeObjectURL(url);
-        }
-      }, "image/png");
-    } catch {
+      if (!blob) {
+        alert("QR code not ready yet.");
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "thankly-qr-card.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("QR download error:", error);
+      alert("Could not generate the QR card. Please try again.");
+    }
+  }
+
+  async function shareCard() {
+    try {
+      const blob = await renderBrandedCardPng();
+      if (!blob) return;
+
+      const file = new File([blob], "thankly-qr-card.png", { type: "image/png" });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: t.shareTitle,
+          text: t.shareText,
+          files: [file],
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "thankly-qr-card.png";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      // User cancelling the native share sheet is not an error
+      if ((error as any)?.name === "AbortError") return;
+
       await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -133,7 +222,7 @@ export default function ShareQrCard({
 
             <button
               type="button"
-              onClick={downloadSvg}
+              onClick={downloadQrCard}
               className="rounded-2xl border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
             >
               {t.downloadQr}
@@ -141,12 +230,14 @@ export default function ShareQrCard({
 
             <button
               type="button"
-              onClick={shareLink}
+              onClick={shareCard}
               className="rounded-2xl border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 transition"
             >
               {copied ? t.copied : t.share}
             </button>
           </div>
+
+          <p className="mt-3 text-xs text-slate-400">{t.linkHint}</p>
         </div>
 
         <div className="flex justify-center">
