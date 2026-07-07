@@ -23,7 +23,7 @@ export default async function ServerPage({ params, searchParams }: PageProps) {
   const supabase = await createServerClient();
 
   const { data: worker, error } = await supabase
-    .from("workers")
+    .from("public_worker_profiles")
     .select("*")
     .eq("profile_slug", slug)
     .single();

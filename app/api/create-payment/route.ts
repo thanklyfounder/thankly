@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createServerClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createServerClient();
+    const supabase = createAdminClient();
 
     const { data: worker, error: workerError } = await supabase
       .from("workers")
