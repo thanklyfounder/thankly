@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import ShareQrCard from "@/components/ShareQrCard";
 import EditWorkerProfile from "@/components/EditWorkerProfile";
 import ResumeStripeButton from "@/components/ResumeStripeButton";
+import ManageStripeButton from "@/components/ManageStripeButton";
 import TaxWithholdingCard from "@/components/TaxWithholdingCard";
 import ExportEarningsButton from "@/components/ExportEarningsButton";
 import WebPayoutCard from "@/components/WebPayoutCard";
@@ -384,6 +385,7 @@ export default function ManageDashboardClient({
                   <p className="mt-1 text-xs text-sky-100">
                     {t.readyText}
                   </p>
+                  <ManageStripeButton language={language} />
                 </>
               ) : (
                 <>
