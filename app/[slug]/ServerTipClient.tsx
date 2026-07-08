@@ -18,7 +18,6 @@ type ServerTipClientProps = {
   success?: boolean;
   canceled?: boolean;
 };
-};
 
 type ParticleData = {
   top: string;
