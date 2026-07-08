@@ -124,11 +124,13 @@ function AuthContent() {
         .eq("auth_user_id", data.user.id)
         .maybeSingle();
 
-      if (worker?.profile_slug) {
-        router.push("/manage");
-      } else {
-        router.push("/create");
+      if (!worker?.profile_slug) {
+        // Provision the worker row if missing (Stripe deferred). Covers accounts
+        // created before deferral and any path that skipped ensure-worker.
+        await fetch("/api/ensure-worker", { method: "POST" });
       }
+
+      router.push("/manage");
     } catch (err) {
       console.error("Sign in error:", err);
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
