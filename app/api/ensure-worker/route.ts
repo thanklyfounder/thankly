@@ -33,6 +33,7 @@ export async function POST() {
     }
 
     const email = user.email ?? "";
+    const fullName = (user.user_metadata?.full_name as string) ?? "";
     const baseSlug =
       email
         .split("@")[0]
@@ -46,7 +47,7 @@ export async function POST() {
       .insert({
         auth_user_id: user.id,
         email,
-        full_name: "",
+        full_name: fullName,
         profile_slug: generatedSlug,
         bio: "Thank you for joining",
         stripe_onboarded: false,
