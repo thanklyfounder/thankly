@@ -14,8 +14,10 @@ type ServerTipClientProps = {
   tipAmount1?: number | null;
   tipAmount2?: number | null;
   tipAmount3?: number | null;
+  stripeOnboarded?: boolean;
   success?: boolean;
   canceled?: boolean;
+};
 };
 
 type ParticleData = {
@@ -70,7 +72,7 @@ export default function ServerTipClient({
   tipAmount3,
   success,
   canceled,
-
+  stripeOnboarded = true,
 }: ServerTipClientProps) {
   const [language, setLanguage] = useState<Language>("en");
   const [selectedAmount, setSelectedAmount] = useState<TipAmount>("preset2");
@@ -324,6 +326,24 @@ export default function ServerTipClient({
         </div>
 
         <div className="bg-white px-6 pt-3 pb-5">
+          {!stripeOnboarded && (
+            <div className="rounded-2xl border border-sky-100 bg-sky-50 p-6 text-center">
+              <p className="text-3xl">🌱</p>
+              <p className="mt-2 text-base font-bold text-slate-900">
+                {language === "en"
+                  ? `${displayName || "This worker"} isn't accepting tips just yet`
+                  : `${displayName || "Esta persona"} aún no está recibiendo propinas`}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {language === "en"
+                  ? "They're still setting up their account. Check back soon!"
+                  : "Todavía está configurando su cuenta. ¡Vuelve pronto!"}
+              </p>
+            </div>
+          )}
+
+          {stripeOnboarded && (
+          <>
           {success && (
             <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4 text-center">
               <p className="text-sm font-semibold text-green-700">
@@ -550,6 +570,8 @@ export default function ServerTipClient({
           <p className="mt-2 text-center text-xs text-slate-400">
             {t.secure}
           </p>
+          </>
+          )}
         </div>
       </div>
     </main>

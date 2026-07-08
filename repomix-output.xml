@@ -63,6 +63,7 @@ app/api/stripe/webhook/route.ts
 app/api/update-tax-settings/route.ts
 app/api/update-worker-profile/route.ts
 app/api/web/initiate-payout/route.ts
+app/api/web/stripe-login-link/route.ts
 app/auth/confirm/page.tsx
 app/auth/page.tsx
 app/auth/reset-password/page.tsx
@@ -93,6 +94,7 @@ components/ExportEarningsButton.tsx
 components/InfoTooltip.tsx
 components/LegalLayout.tsx
 components/ManageDashboardClient.tsx
+components/ManageStripeButton.tsx
 components/ResumeStripeButton.tsx
 components/ShareMomentButton.tsx
 components/ShareQrCard.tsx
@@ -249,60 +251,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-</file>
-
-<file path="app/[slug]/page.tsx">
-import { notFound } from "next/navigation";
-import { createServerClient } from "@/lib/supabase-server";
-import ServerTipClient from "./ServerTipClient";
-
-type PageProps = {
-  params: Promise<{
-    slug: string;
-  }>;
-  searchParams: Promise<{
-    success?: string;
-    canceled?: string;
-  }>;
-};
-
-export default async function ServerPage({ params, searchParams }: PageProps) {
-  const { slug } = await params;
-  const resolvedSearchParams = await searchParams;
-
-  if (!slug) {
-    notFound();
-  }
-
-  const supabase = await createServerClient();
-
-  const { data: worker, error } = await supabase
-    .from("workers")
-    .select("*")
-    .eq("profile_slug", slug)
-    .single();
-
-  if (error || !worker) {
-    notFound();
-  }
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
-  const pageUrl = `${baseUrl}/${worker.profile_slug}`;
-
-  return (
-    <ServerTipClient
-      avatarUrl={worker.avatar_url}
-      displayName={worker.full_name}
-      bio={worker.bio}
-      pageUrl={pageUrl}
-      tipAmount1={worker.tip_amount_1}
-      tipAmount2={worker.tip_amount_2}
-      tipAmount3={worker.tip_amount_3}
-      success={resolvedSearchParams.success === "true"}
-      canceled={resolvedSearchParams.canceled === "true"}
-    />
-  );
-}
 </file>
 
 <file path="app/api/business/create/route.ts">
@@ -506,103 +454,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Unexpected error" },
       { status: 500 }
-    );
-  }
-}
-</file>
-
-<file path="app/api/create-account/complete/route.ts">
-import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
-import { createServerClient } from "@/lib/supabase-server";
-
-export async function GET(req: NextRequest) {
-  try {
-    console.log("HIT COMPLETE ROUTE:", req.url);
-
-    const { searchParams } = new URL(req.url);
-
-    const accountId = searchParams.get("account");
-    const authUserId = searchParams.get("authUserId");
-    const email = searchParams.get("email") ?? "";
-    const fullName = searchParams.get("fullName") ?? "Thankly User";
-    const slug = searchParams.get("slug") ?? "user";
-
-    if (!accountId) {
-      return NextResponse.redirect(
-        new URL("/create?error=missing_account", req.url)
-      );
-    }
-
-    if (!authUserId) {
-      return NextResponse.redirect(
-        new URL("/create?error=missing_auth_user_id", req.url)
-      );
-    }
-
-    const supabase = await createServerClient();
-
-    const account = await stripe.accounts.retrieve(accountId);
-
-    const stripeOnboarded =
-      !!account.details_submitted &&
-      !!account.charges_enabled &&
-      !!account.payouts_enabled;
-
-    const { data: existingWorker, error: workerLookupError } = await supabase
-      .from("workers")
-      .select("id")
-      .eq("auth_user_id", authUserId)
-      .maybeSingle();
-
-    if (workerLookupError) {
-      console.error("Error checking worker:", workerLookupError);
-      return NextResponse.redirect(
-        new URL("/create?error=worker_lookup_failed", req.url)
-      );
-    }
-
-    if (!existingWorker) {
-      const { error: insertError } = await supabase.from("workers").insert({
-        auth_user_id: authUserId,
-        full_name: fullName,
-        email,
-        profile_slug: slug,
-        stripe_account_id: account.id,
-        stripe_onboarded: stripeOnboarded,
-      });
-
-      if (insertError) {
-        console.error("Error creating worker:", insertError);
-        return NextResponse.redirect(
-          new URL("/create?error=worker_insert_failed", req.url)
-        );
-      }
-    } else {
-      const { error: updateError } = await supabase
-        .from("workers")
-        .update({
-          full_name: fullName,
-          email,
-          profile_slug: slug,
-          stripe_account_id: account.id,
-          stripe_onboarded: stripeOnboarded,
-        })
-        .eq("auth_user_id", authUserId);
-
-      if (updateError) {
-        console.error("Error updating worker:", updateError);
-        return NextResponse.redirect(
-          new URL("/create?error=worker_update_failed", req.url)
-        );
-      }
-    }
-
-    return NextResponse.redirect(new URL("/manage", req.url));
-  } catch (error) {
-    console.error("Stripe onboarding complete route error:", error);
-    return NextResponse.redirect(
-      new URL("/create?error=unexpected", req.url)
     );
   }
 }
@@ -1208,6 +1059,47 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/api/web/stripe-login-link/route.ts">
+import { NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
+import { createServerClient } from "@/lib/supabase-server";
+
+export async function POST() {
+  try {
+    const supabase = await createServerClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+    }
+
+    const { data: worker, error } = await supabase
+      .from("workers")
+      .select("stripe_account_id, stripe_onboarded")
+      .eq("auth_user_id", user.id)
+      .single();
+
+    if (error || !worker?.stripe_account_id) {
+      return NextResponse.json({ error: "Stripe account not found." }, { status: 404 });
+    }
+
+    if (!worker.stripe_onboarded) {
+      return NextResponse.json({ error: "Finish Stripe setup first." }, { status: 400 });
+    }
+
+    const loginLink = await stripe.accounts.createLoginLink(worker.stripe_account_id);
+
+    return NextResponse.json({ url: loginLink.url });
+  } catch (e) {
+    console.error("Stripe login link error:", e);
+    return NextResponse.json({ error: "Unable to open Stripe dashboard." }, { status: 500 });
+  }
+}
+</file>
+
 <file path="app/auth/signin/page.tsx">
 "use client";
 
@@ -1375,232 +1267,6 @@ export default function JoinBusinessPage() {
             </p>
           ) : null}
         </div>
-      </div>
-    </main>
-  );
-}
-</file>
-
-<file path="app/business/[slug]/page.tsx">
-import { notFound } from "next/navigation";
-import { createServerClient } from "@/lib/supabase-server";
-import BusinessInviteCard from "@/components/BusinessInviteCard";
-import BusinessExportButton from "@/components/BusinessExportButton";
-
-type PageProps = {
-  params: Promise<{
-    slug: string;
-  }>;
-};
-
-function formatDollars(cents: number | null | undefined) {
-  return `$${((cents ?? 0) / 100).toFixed(2)}`;
-}
-
-export default async function BusinessDashboardPage({ params }: PageProps) {
-  const { slug } = await params;
-
-  const supabase = await createServerClient();
-
-  const { data: business, error: businessError } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("slug", slug)
-    .single();
-
-  if (businessError || !business) {
-    notFound();
-  }
-
-  const { data: links } = await supabase
-    .from("business_workers")
-    .select("worker_id, role, status, joined_at")
-    .eq("business_id", business.id)
-    .order("joined_at", { ascending: false });
-
-  const workerIds = links?.map((link) => link.worker_id) ?? [];
-
-  const { data: workers } =
-    workerIds.length > 0
-      ? await supabase
-          .from("workers")
-          .select("id, full_name, email, profile_slug, stripe_onboarded")
-          .in("id", workerIds)
-      : { data: [] };
-
-  const { data: transactions } =
-    workerIds.length > 0
-      ? await supabase
-          .from("transactions")
-          .select("*")
-          .in("worker_id", workerIds)
-      : { data: [] };
-
-  const totalTips = transactions?.length ?? 0;
-
-  const totalGrossTips =
-    transactions?.reduce((sum, tx) => sum + (tx.tip_amount ?? 0), 0) ?? 0;
-
-  const totalPayout =
-    transactions?.reduce((sum, tx) => sum + (tx.worker_receives ?? 0), 0) ?? 0;
-
-  const totalEstimatedTax =
-    transactions?.reduce((sum, tx) => sum + (tx.tax_reserve_amount ?? 0), 0) ??
-    0;
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
-  const inviteUrl = `${baseUrl}/business/${business.slug}/join`;
-
-  return (
-    <main className="min-h-screen bg-slate-100 px-4 py-8">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
-          <p className="text-sm font-semibold text-sky-100">
-            Thankly Business Dashboard
-          </p>
-
-          <h1 className="mt-2 text-4xl font-bold tracking-tight">
-            {business.name}
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm text-slate-100">
-            View team gratitude activity, invite workers, and prepare business-level reports.
-          </p>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-3xl border border-sky-100 border-l-4 border-l-sky-500 bg-sky-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-sky-700">
-              Total Gross Tips
-            </p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(totalGrossTips)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
-              Across linked workers
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-emerald-100 border-l-4 border-l-emerald-500 bg-emerald-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-emerald-700">
-              Total Worker Payout
-            </p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(totalPayout)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
-              Before estimated Tax Savings Rate
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-100 border-l-4 border-l-amber-500 bg-amber-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-amber-700">
-              Estimated Tax Pocket
-            </p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(totalEstimatedTax)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
-              Worker-level estimates
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-violet-100 border-l-4 border-l-violet-500 bg-violet-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-violet-700">
-              Linked Workers
-            </p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {workers?.length ?? 0}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
-              Active team members
-            </p>
-          </div>
-        </section>
-
-        <BusinessInviteCard inviteUrl={inviteUrl} />
-
-        <section className="rounded-3xl bg-white p-6 shadow-xl">
-          <h2 className="text-xl font-bold text-slate-900">
-            Linked workers
-          </h2>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Workers linked to this business for team reporting.
-          </p>
-
-          {!workers || workers.length === 0 ? (
-            <p className="mt-6 text-slate-500">
-              No workers linked yet. Share the invite QR to get started.
-            </p>
-          ) : (
-            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="w-full min-w-[700px] text-sm">
-                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Name</th>
-                    <th className="px-4 py-3 font-semibold">Email</th>
-                    <th className="px-4 py-3 font-semibold">Slug</th>
-                    <th className="px-4 py-3 font-semibold">Stripe</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {workers.map((worker) => (
-                    <tr
-                      key={worker.id}
-                      className="border-b border-slate-100 bg-white even:bg-slate-50"
-                    >
-                      <td className="px-4 py-4 font-bold text-slate-900">
-                        {worker.full_name}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {worker.email}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {worker.profile_slug}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            worker.stripe_onboarded
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {worker.stripe_onboarded ? "Ready" : "Incomplete"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-3xl bg-white p-6 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">
-                Team reports
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Export combined team tip reports for bookkeeping, payroll, and records.
-              </p>
-            </div>
-
-            <BusinessExportButton
-              businessName={business.name}
-              workers={workers ?? []}
-              transactions={transactions ?? []}
-            />
-          </div>
-        </section>
       </div>
     </main>
   );
@@ -2314,47 +1980,6 @@ export default function BusinessInviteCard({ inviteUrl }: Props) {
 }
 </file>
 
-<file path="components/CopyLinkButton.tsx">
-"use client";
-
-import { useState } from "react";
-
-type CopyLinkButtonProps = {
-  value: string;
-  language?: "en" | "es";
-};
-export default function CopyLinkButton({
-  value,
-  language = "en",
-}: CopyLinkButtonProps) {
-  const [copied, setCopied] = useState(false);
-  
-  async function handleCopy() {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    
-    setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-  }
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="mt-3 rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition"
-    >
-      {copied
-        ? language === "es"
-          ? "¡Copiado!"
-          : "Copied!"
-        : language === "es"
-        ? "Copiar link"
-        : "Copy link"}
-    </button>
-  );
-}
-</file>
-
 <file path="components/ExportEarningsButton.tsx">
 "use client";
 
@@ -2888,6 +2513,48 @@ export default function InfoTooltip({
         </div>
       ) : null}
     </div>
+  );
+}
+</file>
+
+<file path="components/ManageStripeButton.tsx">
+"use client";
+
+import { useState } from "react";
+
+export default function ManageStripeButton({ language = "en" }: { language?: "en" | "es" }) {
+  const [loading, setLoading] = useState(false);
+
+  const label = language === "en" ? "Manage payout account" : "Administrar cuenta de pagos";
+  const loadingLabel = language === "en" ? "Opening…" : "Abriendo…";
+
+  async function handleManage() {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/web/stripe-login-link", { method: "POST" });
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error ?? "Unable to open Stripe dashboard.");
+        setLoading(false);
+      }
+    } catch {
+      alert("Unable to open Stripe dashboard.");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleManage}
+      disabled={loading}
+      className="mt-3 rounded-2xl bg-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/25 transition disabled:opacity-60"
+    >
+      {loading ? loadingLabel : label}
+    </button>
   );
 }
 </file>
@@ -5933,6 +5600,60 @@ export function clamp(value: number, min: number, max: number) {
 }
 </file>
 
+<file path="app/[slug]/page.tsx">
+import { notFound } from "next/navigation";
+import { createServerClient } from "@/lib/supabase-server";
+import ServerTipClient from "./ServerTipClient";
+
+type PageProps = {
+  params: Promise<{
+    slug: string;
+  }>;
+  searchParams: Promise<{
+    success?: string;
+    canceled?: string;
+  }>;
+};
+
+export default async function ServerPage({ params, searchParams }: PageProps) {
+  const { slug } = await params;
+  const resolvedSearchParams = await searchParams;
+
+  if (!slug) {
+    notFound();
+  }
+
+  const supabase = await createServerClient();
+
+  const { data: worker, error } = await supabase
+    .from("public_worker_profiles")
+    .select("*")
+    .eq("profile_slug", slug)
+    .single();
+
+  if (error || !worker) {
+    notFound();
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  const pageUrl = `${baseUrl}/${worker.profile_slug}`;
+
+  return (
+    <ServerTipClient
+      avatarUrl={worker.avatar_url}
+      displayName={worker.full_name}
+      bio={worker.bio}
+      pageUrl={pageUrl}
+      tipAmount1={worker.tip_amount_1}
+      tipAmount2={worker.tip_amount_2}
+      tipAmount3={worker.tip_amount_3}
+      success={resolvedSearchParams.success === "true"}
+      canceled={resolvedSearchParams.canceled === "true"}
+    />
+  );
+}
+</file>
+
 <file path="app/[slug]/ServerTipClient.tsx">
 "use client";
 
@@ -6493,148 +6214,98 @@ export default function ServerTipClient({
 }
 </file>
 
-<file path="app/api/create-payment/route.ts">
-// app/api/create-payment/route.ts
-// Change: added avatar_url to both metadata blocks so success page can show worker photo.
-// Everything else is unchanged from original.
-
+<file path="app/api/create-account/complete/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createServerClient } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase-admin";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const body = await req.json();
-    const slug = body?.slug;
-    const amount = Number(body?.amount);
-    const coverFee = Boolean(body?.coverFee);
+    console.log("HIT COMPLETE ROUTE:", req.url);
 
-    if (!slug || !amount) {
-      return NextResponse.json(
-        { error: "Missing slug or amount" },
-        { status: 400 }
+    const { searchParams } = new URL(req.url);
+
+    const accountId = searchParams.get("account");
+    const authUserId = searchParams.get("authUserId");
+    const email = searchParams.get("email") ?? "";
+    const fullName = searchParams.get("fullName") ?? "Thankly User";
+    const slug = searchParams.get("slug") ?? "user";
+
+    if (!accountId) {
+      return NextResponse.redirect(
+        new URL("/create?error=missing_account", req.url)
       );
     }
 
-    const minimumAmount = 500; // $5 minimum
-    const maximumAmount = 50000; // $500 safety cap for now
-
-    if (amount < minimumAmount) {
-      return NextResponse.json(
-        { error: "Minimum tip is $5.00" },
-        { status: 400 }
+    if (!authUserId) {
+      return NextResponse.redirect(
+        new URL("/create?error=missing_auth_user_id", req.url)
       );
     }
 
-    if (amount > maximumAmount) {
-      return NextResponse.json(
-        { error: "Maximum tip is $500.00" },
-        { status: 400 }
-      );
-    }
+    const supabase = createAdminClient();
 
-    const supabase = await createServerClient();
+    const account = await stripe.accounts.retrieve(accountId);
 
-    const { data: worker, error: workerError } = await supabase
+    const stripeOnboarded =
+      !!account.details_submitted &&
+      !!account.charges_enabled &&
+      !!account.payouts_enabled;
+
+    const { data: existingWorker, error: workerLookupError } = await supabase
       .from("workers")
-      .select("id, full_name, profile_slug, stripe_account_id, stripe_onboarded, avatar_url")
-      .eq("profile_slug", slug)
-      .single();
+      .select("id")
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
 
-    if (workerError || !worker) {
-      return NextResponse.json(
-        { error: "Worker not found" },
-        { status: 404 }
+    if (workerLookupError) {
+      console.error("Error checking worker:", workerLookupError);
+      return NextResponse.redirect(
+        new URL("/create?error=worker_lookup_failed", req.url)
       );
     }
 
-    if (!worker.stripe_account_id || !worker.stripe_onboarded) {
-      return NextResponse.json(
-        { error: "Worker Stripe account not ready" },
-        { status: 400 }
-      );
-    }
+    if (!existingWorker) {
+      const { error: insertError } = await supabase.from("workers").insert({
+        auth_user_id: authUserId,
+        full_name: fullName,
+        email,
+        profile_slug: slug,
+        stripe_account_id: account.id,
+        stripe_onboarded: stripeOnboarded,
+      });
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
-
-    // Fee calculations (unchanged from original)
-    const thanklyFeeRate = 0.04;
-    const stripeFixedFee = 30;
-    const stripePercentFee = 0.029;
-
-    let finalChargeAmount: number;
-    let stripeFee: number;
-    let thanklyFee: number;
-    let workerReceives: number;
-    let applicationFeeAmount: number;
-
-    if (coverFee) {
-      // Customer covers all fees — worker receives full tip amount
-      const grossWithFees = Math.ceil(
-        (amount + stripeFixedFee) / (1 - stripePercentFee - thanklyFeeRate)
-      );
-      finalChargeAmount = grossWithFees;
-      stripeFee = Math.round(grossWithFees * stripePercentFee + stripeFixedFee);
-      thanklyFee = Math.round(grossWithFees * thanklyFeeRate);
-      workerReceives = amount;
-      applicationFeeAmount = thanklyFee + stripeFee;
+      if (insertError) {
+        console.error("Error creating worker:", insertError);
+        return NextResponse.redirect(
+          new URL("/create?error=worker_insert_failed", req.url)
+        );
+      }
     } else {
-      // Worker absorbs fees
-      finalChargeAmount = amount;
-      stripeFee = Math.round(amount * stripePercentFee + stripeFixedFee);
-      thanklyFee = Math.round(amount * thanklyFeeRate);
-      workerReceives = amount - thanklyFee - stripeFee;
-      applicationFeeAmount = thanklyFee + stripeFee;
+      const { error: updateError } = await supabase
+        .from("workers")
+        .update({
+          full_name: fullName,
+          email,
+          profile_slug: slug,
+          stripe_account_id: account.id,
+          stripe_onboarded: stripeOnboarded,
+        })
+        .eq("auth_user_id", authUserId);
+
+      if (updateError) {
+        console.error("Error updating worker:", updateError);
+        return NextResponse.redirect(
+          new URL("/create?error=worker_update_failed", req.url)
+        );
+      }
     }
 
-    const sharedMetadata = {
-      worker_id: worker.id,
-      worker_name: worker.full_name ?? "",
-      avatar_url: worker.avatar_url ?? "",   // NEW — used by success page for worker photo
-      slug: worker.profile_slug,
-      tip_amount: String(amount),
-      final_charge_amount: String(finalChargeAmount),
-      stripe_fee: String(stripeFee),
-      thankly_fee: String(thanklyFee),
-      worker_receives: String(workerReceives),
-      customer_covered_fee: String(coverFee),
-    };
-
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Tip for ${worker.full_name}`,
-            },
-            unit_amount: finalChargeAmount,
-          },
-          quantity: 1,
-        },
-      ],
-
-      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/${worker.profile_slug}?canceled=true`,
-
-      payment_intent_data: {
-        transfer_data: {
-          destination: worker.stripe_account_id,
-        },
-        application_fee_amount: applicationFeeAmount,
-        metadata: sharedMetadata,
-      },
-
-      metadata: sharedMetadata,
-    });
-
-    return NextResponse.json({ url: session.url });
+    return NextResponse.redirect(new URL("/manage", req.url));
   } catch (error) {
-    console.error("Create payment error:", error);
-    return NextResponse.json(
-      { error: "Unable to create payment" },
-      { status: 500 }
+    console.error("Stripe onboarding complete route error:", error);
+    return NextResponse.redirect(
+      new URL("/create?error=unexpected", req.url)
     );
   }
 }
@@ -6977,6 +6648,244 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/business/[slug]/page.tsx">
+import { notFound, redirect } from "next/navigation";
+import { createServerClient } from "@/lib/supabase-server";
+import BusinessInviteCard from "@/components/BusinessInviteCard";
+import BusinessExportButton from "@/components/BusinessExportButton";
+
+type PageProps = {
+  params: Promise<{
+    slug: string;
+  }>;
+};
+
+function formatDollars(cents: number | null | undefined) {
+  return `$${((cents ?? 0) / 100).toFixed(2)}`;
+}
+
+export default async function BusinessDashboardPage({ params }: PageProps) {
+  const { slug } = await params;
+
+  const supabase = await createServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/auth");
+  }
+
+  const { data: business, error: businessError } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("slug", slug)
+    .single();
+
+  if (businessError || !business) {
+    notFound();
+  }
+
+  if (business.owner_auth_user_id !== user.id) {
+    notFound();
+  }
+
+  const { data: links } = await supabase
+    .from("business_workers")
+    .select("worker_id, role, status, joined_at")
+    .eq("business_id", business.id)
+    .order("joined_at", { ascending: false });
+
+  const workerIds = links?.map((link) => link.worker_id) ?? [];
+
+  const { data: workers } =
+    workerIds.length > 0
+      ? await supabase
+          .from("workers")
+          .select("id, full_name, email, profile_slug, stripe_onboarded")
+          .in("id", workerIds)
+      : { data: [] };
+
+  const { data: transactions } =
+    workerIds.length > 0
+      ? await supabase
+          .from("transactions")
+          .select("*")
+          .in("worker_id", workerIds)
+      : { data: [] };
+
+  const totalTips = transactions?.length ?? 0;
+
+  const totalGrossTips =
+    transactions?.reduce((sum, tx) => sum + (tx.tip_amount ?? 0), 0) ?? 0;
+
+  const totalPayout =
+    transactions?.reduce((sum, tx) => sum + (tx.worker_receives ?? 0), 0) ?? 0;
+
+  const totalEstimatedTax =
+    transactions?.reduce((sum, tx) => sum + (tx.tax_reserve_amount ?? 0), 0) ??
+    0;
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  const inviteUrl = `${baseUrl}/business/${business.slug}/join`;
+
+  return (
+    <main className="min-h-screen bg-slate-100 px-4 py-8">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
+          <p className="text-sm font-semibold text-sky-100">
+            Thankly Business Dashboard
+          </p>
+
+          <h1 className="mt-2 text-4xl font-bold tracking-tight">
+            {business.name}
+          </h1>
+
+          <p className="mt-2 max-w-2xl text-sm text-slate-100">
+            View team gratitude activity, invite workers, and prepare business-level reports.
+          </p>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-3xl border border-sky-100 border-l-4 border-l-sky-500 bg-sky-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-sky-700">
+              Total Gross Tips
+            </p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(totalGrossTips)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Across linked workers
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-emerald-100 border-l-4 border-l-emerald-500 bg-emerald-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-emerald-700">
+              Total Worker Payout
+            </p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(totalPayout)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Before estimated Tax Savings Rate
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-amber-100 border-l-4 border-l-amber-500 bg-amber-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-amber-700">
+              Estimated Tax Pocket
+            </p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(totalEstimatedTax)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Worker-level estimates
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-violet-100 border-l-4 border-l-violet-500 bg-violet-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-violet-700">
+              Linked Workers
+            </p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {workers?.length ?? 0}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Active team members
+            </p>
+          </div>
+        </section>
+
+        <BusinessInviteCard inviteUrl={inviteUrl} />
+
+        <section className="rounded-3xl bg-white p-6 shadow-xl">
+          <h2 className="text-xl font-bold text-slate-900">
+            Linked workers
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Workers linked to this business for team reporting.
+          </p>
+
+          {!workers || workers.length === 0 ? (
+            <p className="mt-6 text-slate-500">
+              No workers linked yet. Share the invite QR to get started.
+            </p>
+          ) : (
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full min-w-[700px] text-sm">
+                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Name</th>
+                    <th className="px-4 py-3 font-semibold">Email</th>
+                    <th className="px-4 py-3 font-semibold">Slug</th>
+                    <th className="px-4 py-3 font-semibold">Stripe</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {workers.map((worker) => (
+                    <tr
+                      key={worker.id}
+                      className="border-b border-slate-100 bg-white even:bg-slate-50"
+                    >
+                      <td className="px-4 py-4 font-bold text-slate-900">
+                        {worker.full_name}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
+                        {worker.email}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-600">
+                        {worker.profile_slug}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            worker.stripe_onboarded
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {worker.stripe_onboarded ? "Ready" : "Incomplete"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-3xl bg-white p-6 shadow-xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Team reports
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Export combined team tip reports for bookkeeping, payroll, and records.
+              </p>
+            </div>
+
+            <BusinessExportButton
+              businessName={business.name}
+              workers={workers ?? []}
+              transactions={transactions ?? []}
+            />
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+</file>
+
 <file path="app/disclosures/page.tsx">
 import type { Metadata } from 'next'
 import LegalLayout from '@/components/LegalLayout'
@@ -7262,6 +7171,47 @@ export default async function ManagePage() {
       transactions={transactions ?? []}
       publicUrl={publicUrl}
     />
+  );
+}
+</file>
+
+<file path="components/CopyLinkButton.tsx">
+"use client";
+
+import { useState } from "react";
+
+type CopyLinkButtonProps = {
+  value: string;
+  language?: "en" | "es";
+};
+export default function CopyLinkButton({
+  value,
+  language = "en",
+}: CopyLinkButtonProps) {
+  const [copied, setCopied] = useState(false);
+  
+  async function handleCopy() {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition"
+    >
+      {copied
+        ? language === "es"
+          ? "¡Copiado!"
+          : "Copied!"
+        : language === "es"
+        ? "Copiar link"
+        : "Copy link"}
+    </button>
   );
 }
 </file>
@@ -20755,6 +20705,153 @@ export function clamp(value: number, min: number, max: number) {
 </files>
 </file>
 
+<file path="app/api/create-payment/route.ts">
+// app/api/create-payment/route.ts
+// Change: added avatar_url to both metadata blocks so success page can show worker photo.
+// Everything else is unchanged from original.
+
+import { NextRequest, NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
+import { createAdminClient } from "@/lib/supabase-admin";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const slug = body?.slug;
+    const amount = Number(body?.amount);
+    const coverFee = Boolean(body?.coverFee);
+
+    if (!slug || !amount) {
+      return NextResponse.json(
+        { error: "Missing slug or amount" },
+        { status: 400 }
+      );
+    }
+
+    const minimumAmount = 500; // $5 minimum
+    const maximumAmount = 50000; // $500 safety cap for now
+
+    if (amount < minimumAmount) {
+      return NextResponse.json(
+        { error: "Minimum tip is $5.00" },
+        { status: 400 }
+      );
+    }
+
+    if (amount > maximumAmount) {
+      return NextResponse.json(
+        { error: "Maximum tip is $500.00" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createAdminClient();
+
+    const { data: worker, error: workerError } = await supabase
+      .from("workers")
+      .select("id, full_name, profile_slug, stripe_account_id, stripe_onboarded, avatar_url")
+      .eq("profile_slug", slug)
+      .single();
+
+    if (workerError || !worker) {
+      return NextResponse.json(
+        { error: "Worker not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!worker.stripe_account_id || !worker.stripe_onboarded) {
+      return NextResponse.json(
+        { error: "Worker Stripe account not ready" },
+        { status: 400 }
+      );
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
+
+    // Fee calculations (unchanged from original)
+    const thanklyFeeRate = 0.04;
+    const stripeFixedFee = 30;
+    const stripePercentFee = 0.029;
+
+    let finalChargeAmount: number;
+    let stripeFee: number;
+    let thanklyFee: number;
+    let workerReceives: number;
+    let applicationFeeAmount: number;
+
+    if (coverFee) {
+      // Customer covers all fees — worker receives full tip amount
+      const grossWithFees = Math.ceil(
+        (amount + stripeFixedFee) / (1 - stripePercentFee - thanklyFeeRate)
+      );
+      finalChargeAmount = grossWithFees;
+      stripeFee = Math.round(grossWithFees * stripePercentFee + stripeFixedFee);
+      thanklyFee = Math.round(grossWithFees * thanklyFeeRate);
+      workerReceives = amount;
+      applicationFeeAmount = thanklyFee + stripeFee;
+    } else {
+      // Worker absorbs fees
+      finalChargeAmount = amount;
+      stripeFee = Math.round(amount * stripePercentFee + stripeFixedFee);
+      thanklyFee = Math.round(amount * thanklyFeeRate);
+      workerReceives = amount - thanklyFee - stripeFee;
+      applicationFeeAmount = thanklyFee + stripeFee;
+    }
+
+    const sharedMetadata = {
+      worker_id: worker.id,
+      worker_name: worker.full_name ?? "",
+      avatar_url: worker.avatar_url ?? "",   // NEW — used by success page for worker photo
+      slug: worker.profile_slug,
+      tip_amount: String(amount),
+      final_charge_amount: String(finalChargeAmount),
+      stripe_fee: String(stripeFee),
+      thankly_fee: String(thanklyFee),
+      worker_receives: String(workerReceives),
+      customer_covered_fee: String(coverFee),
+    };
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Tip for ${worker.full_name}`,
+            },
+            unit_amount: finalChargeAmount,
+          },
+          quantity: 1,
+        },
+      ],
+
+      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/${worker.profile_slug}?canceled=true`,
+
+      payment_intent_data: {
+        transfer_data: {
+          destination: worker.stripe_account_id,
+        },
+        application_fee_amount: applicationFeeAmount,
+        metadata: sharedMetadata,
+      },
+
+      metadata: sharedMetadata,
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (error) {
+    console.error("Create payment error:", error);
+    return NextResponse.json(
+      { error: "Unable to create payment" },
+      { status: 500 }
+    );
+  }
+}
+</file>
+
 <file path="app/api/mobile/initiate-payout/route.ts">
 // app/api/mobile/initiate-payout/route.ts
 // This route did not previously exist — the mobile app was calling it and receiving
@@ -21025,227 +21122,6 @@ export default function ContactPage() {
     </main>
     </>
   );
-}
-</file>
-
-<file path="app/globals.css">
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-@keyframes pulseGlow {
-  0% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.05); }
-  100% { opacity: 0.6; transform: scale(1); }
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-@keyframes lightSweep {
-  0% { transform: translateX(-55%); opacity: 0; }
-  8% { opacity: 1; }
-  18% { transform: translateX(135%); opacity: 0; }
-  100% { transform: translateX(135%); opacity: 0; }
-}
-
-@keyframes tapShimmer {
-  0% { transform: translateX(-85%); opacity: 0; }
-  25% { opacity: 1; }
-  100% { transform: translateX(90%); opacity: 0; }
-}
-
-@keyframes twinkleFar {
-  0%, 100% {
-    transform: translateY(0px) scale(0.9);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0;
-  }
-  45% {
-    transform: translateY(-4px) scale(1.15);
-    opacity: 0.75;
-  }
-  70% {
-    opacity: 0;
-  }
-}
-
-@keyframes twinkleNear {
-  0%, 100% {
-    transform: translateY(0px) scale(0.9);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0;
-  }
-  42% {
-    transform: translateY(-5px) scale(1.2);
-    opacity: 1;
-  }
-  68% {
-    opacity: 0;
-  }
-}
-
-.particle,
-.particle-near {
-  position: absolute;
-  border-radius: 9999px;
-  pointer-events: none;
-}
-
-.particle {
-  width: 1px;
-  height: 1px;
-  background: rgba(255, 255, 255, 1);
-  box-shadow:
-    0 0 8px rgba(255,255,255,0.65),
-    0 0 18px rgba(191, 219, 254, 0.35),
-    0 0 28px rgba(56, 189, 248, 0.18);
-  animation-name: twinkleFar;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-.particle-near {
-  width: 2px;
-  height: 2px;
-  background: rgba(255, 255, 255, 1);
-  box-shadow:
-    0 0 10px rgba(255,255,255,0.95),
-    0 0 22px rgba(147, 197, 253, 0.5),
-    0 0 36px rgba(56, 189, 248, 0.24);
-  animation-name: twinkleNear;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-.legal-content h2 {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #0D1B2A;
-  margin-top: 2.5rem;
-  margin-bottom: 1rem;
-  letter-spacing: -0.01em;
-}
-
-.legal-content h2:first-child {
-  margin-top: 0;
-}
-
-.legal-content h3 {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #1B3A6B;
-  margin-top: 2rem;
-  margin-bottom: 0.75rem;
-}
-
-.legal-content p {
-  font-size: 0.95rem;
-  line-height: 1.75;
-  color: #4A5568;
-  margin-bottom: 1rem;
-}
-
-.legal-content ul {
-  margin-bottom: 1.25rem;
-  padding-left: 1.25rem;
-}
-
-.legal-content li {
-  font-size: 0.95rem;
-  line-height: 1.7;
-  color: #4A5568;
-  margin-bottom: 0.5rem;
-  list-style-type: disc;
-}
-
-.legal-content a {
-  color: #00B4D8;
-  text-decoration: underline;
-  text-decoration-color: rgba(0, 180, 216, 0.3);
-}
-
-.legal-content a:hover {
-  text-decoration-color: #00B4D8;
-}
-
-.legal-content strong {
-  font-weight: 700;
-  color: #0D1B2A;
-}
-
-.legal-content table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1.5rem 0;
-  font-size: 0.875rem;
-}
-
-.legal-content th {
-  text-align: left;
-  font-weight: 700;
-  color: #0D1B2A;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 2px solid #E2E8F0;
-}
-
-.legal-content td {
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid #EDF2F7;
-  color: #4A5568;
-}
-
-.legal-content section {
-  margin-bottom: 1rem;
-}
-
-.legal-content .info-box {
-  background: #F0F6FF;
-  border-left: 4px solid #00B4D8;
-  border-radius: 0 12px 12px 0;
-  padding: 1rem 1.25rem;
-  margin: 1.25rem 0;
-  font-size: 0.9rem;
-  color: #1B3A6B;
-  line-height: 1.6;
-}
-
-.legal-content .warning-box {
-  background: #FFF7ED;
-  border-left: 4px solid #F97316;
-  border-radius: 0 12px 12px 0;
-  padding: 1rem 1.25rem;
-  margin: 1.25rem 0;
-  font-size: 0.9rem;
-  color: #7C2D12;
-  line-height: 1.6;
 }
 </file>
 
@@ -21830,872 +21706,6 @@ export default function LegalLayout({
       </footer>
     </>
   )
-}
-</file>
-
-<file path="components/ManageDashboardClient.tsx">
-"use client";
-
-import { useMemo, useState } from "react";
-import ShareQrCard from "@/components/ShareQrCard";
-import EditWorkerProfile from "@/components/EditWorkerProfile";
-import ResumeStripeButton from "@/components/ResumeStripeButton";
-import TaxWithholdingCard from "@/components/TaxWithholdingCard";
-import ExportEarningsButton from "@/components/ExportEarningsButton";
-import AppNav from "@/components/AppNav";
-
-type Filter = "today" | "week" | "month" | "all" | "custom";
-type Language = "en" | "es";
-
-type Worker = {
-  id: string;
-  full_name: string;
-  email: string;
-  bio: string | null;
-  bio_es: string | null;
-  profile_slug: string;
-  stripe_onboarded: boolean;
-  stripe_account_id: string | null;
-  tax_withholding_rate: number | null;
-  auth_user_id: string;
-};
-
-type Transaction = {
-  id: string;
-  tip_amount: number;
-  fee_amount: number;
-  worker_receives: number;
-  tax_reserve_amount: number;
-  available_amount: number;
-  status: string;
-  created_at: string;
-};
-
-type Props = {
-  worker: Worker;
-  transactions: Transaction[];
-  publicUrl: string;
-};
-
-function formatDollars(cents: number | null | undefined) {
-  return `$${((cents ?? 0) / 100).toFixed(2)}`;
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
-  return new Date(value).toLocaleString();
-}
-
-function formatStatus(value: string | null | undefined) {
-  if (!value) return "Unknown";
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function isInRange(
-  dateValue: string,
-  filter: Filter,
-  customStartDate: string,
-  customEndDate: string
-) {
-  const txDate = new Date(dateValue);
-  const now = new Date();
-
-  if (filter === "all") return true;
-
-  if (filter === "today") {
-    return txDate.toDateString() === now.toDateString();
-  }
-
-  if (filter === "week") {
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    return txDate >= startOfWeek;
-  }
-
-  if (filter === "month") {
-    return (
-      txDate.getFullYear() === now.getFullYear() &&
-      txDate.getMonth() === now.getMonth()
-    );
-  }
-
-  if (filter === "custom") {
-    if (!customStartDate && !customEndDate) return true;
-
-    const start = customStartDate ? new Date(customStartDate) : null;
-    const end = customEndDate ? new Date(customEndDate) : null;
-
-    if (start) {
-      start.setHours(0, 0, 0, 0);
-    }
-
-    if (end) {
-      end.setHours(23, 59, 59, 999);
-    }
-
-    if (start && txDate < start) return false;
-    if (end && txDate > end) return false;
-
-    return true;
-  }
-
-  return true;
-}
-
-export default function ManageDashboardClient({
-  worker,
-  transactions,
-  publicUrl,
-}: Props) {
-  const [language, setLanguage] = useState<Language>("en");
-  const [filter, setFilter] = useState<Filter>("today");
-  const [customStartDate, setCustomStartDate] = useState("");
-  const [customEndDate, setCustomEndDate] = useState("");
-  const t = {
-    dashboard:
-      language === "en"
-        ? "Thankly Dashboard"
-        : "Panel de Thankly",
-
-    welcome:
-      language === "en"
-        ? `Welcome, ${worker.full_name}`
-        : `Bienvenido, ${worker.full_name}`,
-
-    subtitle:
-      language === "en"
-        ? "Manage your gratitude page, track earnings, and share your QR code."
-        : "Administra tu página de agradecimiento, revisa tus ingresos y comparte tu código QR.",
-
-    stripeStatus:
-      language === "en"
-        ? "Stripe Status"
-        : "Estado de Stripe",
-
-    ready:
-      language === "en"
-        ? "✅ Ready"
-        : "✅ Listo",
-
-    readyText:
-      language === "en"
-        ? "Ready to receive tips."
-        : "Listo para recibir agradecimientos.",
-
-    setupIncomplete:
-      language === "en"
-        ? "⚠️ Setup incomplete"
-        : "⚠️ Configuración incompleta",
-
-    finishStripe:
-      language === "en"
-        ? "Finish Stripe setup to receive payouts."
-        : "Completa Stripe para recibir pagos.",
-
-    today:
-      language === "en"
-        ? "Today"
-        : "Hoy",
-
-    week:
-      language === "en"
-        ? "This Week"
-        : "Esta semana",
-
-    month:
-      language === "en"
-        ? "This Month"
-        : "Este mes",
-
-    all:
-      language === "en"
-        ? "All Time"
-        : "Todo",
-
-    custom:
-      language === "en"
-        ? "Custom"
-        : "Personalizado",
-
-    from:
-      language === "en"
-        ? "From"
-        : "Desde",
-
-    to:
-      language === "en"
-        ? "To"
-        : "Hasta",
-
-    workerReceives:
-      language === "en"
-        ? "Worker Receives"
-        : "Recibe",
-
-    beforeTax:
-      language === "en"
-        ? "Before tax pocket"
-        : "Antes de ahorro fiscal",
-
-    totalVolume:
-      language === "en"
-      ? "Total Volume"
-      : "Monto total",
-
-    grossProcessed:
-      language === "en"
-        ? "Gross tips processed"
-        : "Agradecimientos procesados",
-
-    totalTips:
-      language === "en"
-        ? "Total Tips"
-        : "Total",
-
-    completedPayments:
-      language === "en"
-        ? "Completed payments"
-        : "Pagos completados",
-
-    avgTip:
-      language === "en"
-        ? "Avg. Tip"
-        : "Promedio",
-
-    perCustomer:
-      language === "en"
-        ? "Per customer"
-        : "Por cliente",
-
-    recentTransactions:
-      language === "en"
-        ? "Recent Transactions"
-        : "Movimientos recientes",
-
-    recentSubtitle:
-      language === "en"
-        ? "Latest completed tips and Thankly fee breakdown."
-        : "Últimos agradecimientos completados y desglose de Thankly.",
-
-    thanklyFees:
-      language === "en"
-        ? "Thankly Fees"
-        : "Ingresos Thankly",
-
-    noTransactions:
-      language === "en"
-        ? "No transactions for this period."
-        : "No hay movimientos en este período.",
-
-    date:
-      language === "en"
-        ? "Date"
-        : "Fecha",
-
-    tip:
-      language === "en"
-        ? "Tip"
-        : "Agradecimiento",
-
-    fee:
-      language === "en"
-        ? "Fee"
-        : "Cargo",
-
-    taxReserve:
-      language === "en"
-        ? "Estimated Tax Pocket"
-        : "Reserva",
-
-    available:
-      language === "en"
-        ? "Safe-to-Spend"
-        : "Disponible",
-
-    status:
-      language === "en"
-        ? "Status"
-      : "Estado",
-    
-  };
-
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) =>
-      isInRange(tx.created_at, filter, customStartDate, customEndDate)
-    );
-  }, [transactions, filter, customStartDate, customEndDate]);
-
-  const totalTips = filteredTransactions.length;
-
-  const totalEarnedCents = filteredTransactions.reduce(
-    (sum, tx) => sum + (tx.worker_receives ?? 0),
-    0
-  );
-
-  const totalVolumeCents = filteredTransactions.reduce(
-    (sum, tx) => sum + (tx.tip_amount ?? 0),
-    0
-  );
-
-  const totalFeesCents = filteredTransactions.reduce(
-    (sum, tx) => sum + (tx.fee_amount ?? 0),
-    0
-  );
-
-  const avgTipCents =
-    totalTips > 0 ? Math.round(totalVolumeCents / totalTips) : 0;
-
-  const filters: { label: string; value: Filter }[] = [
-    { label: t.today, value: "today" },
-    { label: t.week, value: "week" },
-    { label: t.month, value: "month" },
-    { label: t.all, value: "all" },
-    { label: t.custom, value: "custom" },
-  ];
-
-  return (
-    <>
-    <AppNav variant="app" />
-    <div className="bg-[#00B4D8]/15 border-b border-[#00B4D8]/30 px-[5%] py-3 flex items-center justify-between gap-4">
-      <p className="text-sm text-[#0F2347] font-medium">
-        🎉 You're in early! The Thankly app is coming soon to the App Store and Google Play. Manage your account here in the meantime.
-      </p>
-    </div>
-    <main className="min-h-screen bg-slate-100 px-4 py-8">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
-          <div className="mb-5 flex justify-end">
-            <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white backdrop-blur">
-              <button
-                type="button"
-                onClick={() => setLanguage("en")}
-                className={`rounded-full px-3 py-1 ${
-                  language === "en"
-                    ? "bg-white text-sky-700"
-                    : "text-white/80"
-                }`}
-              >
-                English
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLanguage("es")}
-                className={`rounded-full px-3 py-1 ${
-                  language === "es"
-                    ? "bg-white text-sky-700"
-                    : "text-white/80"
-                }`}
-              >
-                Español
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-sky-100">
-                {t.dashboard}
-              </p>
-
-              <h1 className="mt-2 text-4xl font-bold tracking-tight">
-                {t.welcome}
-              </h1>
-
-              <p className="mt-2 max-w-2xl text-sm text-slate-100">
-                {t.subtitle}
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-white/15 px-5 py-4 shadow-lg backdrop-blur">
-              <p className="text-xs uppercase tracking-wide text-sky-100">
-                {t.stripeStatus}
-              </p>
-
-              {worker.stripe_onboarded ? (
-                <>
-                  <p className="mt-1 text-lg font-semibold">{t.ready}</p>
-                  <p className="mt-1 text-xs text-sky-100">
-                    {t.readyText}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-1 text-lg font-semibold">
-                    {t.setupIncomplete}
-                  </p>
-                  <p className="mt-1 text-xs text-sky-100">
-                    {t.finishStripe}
-                  </p>
-
-                  <ResumeStripeButton
-                    accountId={worker.stripe_account_id}
-                    authUserId={worker.auth_user_id}
-                    email={worker.email}
-                    fullName={worker.full_name}
-                    slug={worker.profile_slug}
-                  />
-                </>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl bg-white p-4 shadow-xl">
-          <div className="flex flex-wrap gap-2">
-            {filters.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setFilter(item.value)}
-                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-                  filter === item.value
-                    ? "bg-sky-600 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          {filter === "custom" && (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {t.from}
-                </label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {t.to}
-                </label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-3xl border border-emerald-100 border-l-4 border-l-emerald-500 bg-emerald-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-emerald-700">
-              {t.workerReceives}
-            </p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(totalEarnedCents)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.beforeTax}</p>
-          </div>
-
-          <div className="rounded-3xl border border-sky-100 border-l-4 border-l-sky-500 bg-sky-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-sky-700">{t.totalVolume}</p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(totalVolumeCents)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.grossProcessed}</p>
-          </div>
-
-          <div className="rounded-3xl border border-amber-100 border-l-4 border-l-amber-500 bg-amber-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-amber-700">{t.totalTips}</p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {totalTips}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.completedPayments}</p>
-          </div>
-
-          <div className="rounded-3xl border border-violet-100 border-l-4 border-l-violet-500 bg-violet-50 p-6 shadow-xl">
-            <p className="text-sm font-semibold text-violet-700">{t.avgTip}</p>
-            <p className="mt-2 text-4xl font-bold text-slate-900">
-              {formatDollars(avgTipCents)}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">{t.perCustomer}</p>
-          </div>
-        </section>
-
-        <TaxWithholdingCard
-          workerId={worker.id}
-          initialRate={worker.tax_withholding_rate}
-          totalEarnedCents={totalEarnedCents}
-          language={language}
-        />
-
-        <ShareQrCard publicUrl={publicUrl} workerName={worker.full_name} language={language} />
-
-        <EditWorkerProfile
-          workerId={worker.id}
-          initialName={worker.full_name}
-          initialBio={worker.bio}
-          initialBioEs={worker.bio_es}
-          language={language}
-        />
-
-        <section className="rounded-3xl bg-white p-6 shadow-xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">
-                {t.recentTransactions}
-              </h2>
-              <p className="text-sm text-slate-500">
-                {t.recentSubtitle}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-2xl bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
-                {t.thanklyFees}: {formatDollars(totalFeesCents)}
-              </div>
-
-              <ExportEarningsButton
-                workerName={worker.full_name}
-                transactions={filteredTransactions}
-                language={language}
-              />
-            </div>
-
-          </div>
-
-          {filteredTransactions.length === 0 ? (
-            <p className="mt-6 text-slate-500">
-              {t.noTransactions}
-            </p>
-          ) : (
-            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">{t.date}</th>
-                    <th className="px-4 py-3 font-semibold">{t.tip}</th>
-                    <th className="px-4 py-3 font-semibold">{t.fee}</th>
-                    <th className="px-4 py-3 font-semibold">{t.workerReceives}</th>
-                    <th className="px-4 py-3 font-semibold">{t.taxReserve}</th>
-                    <th className="px-4 py-3 font-semibold">{t.available}</th>
-                    <th className="px-4 py-3 font-semibold">{t.status}</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredTransactions.map((tx) => (
-                    <tr
-                      key={tx.id}
-                      className="border-b border-slate-100 bg-white even:bg-slate-50 hover:bg-sky-50 transition"
-                    >
-                      <td className="px-4 py-4 text-slate-600">
-                        {formatDate(tx.created_at)}
-                      </td>
-
-                      <td className="px-4 py-4 font-bold text-slate-900">
-                        {formatDollars(tx.tip_amount)}
-                      </td>
-
-                      <td className="px-4 py-4 font-semibold text-slate-700">
-                        {formatDollars(tx.fee_amount)}
-                      </td>
-
-                      <td className="px-4 py-4 font-bold text-slate-900">
-                        {formatDollars(tx.worker_receives)}
-                      </td>
-
-                      <td className="px-4 py-4 font-semibold text-amber-700">
-                        {formatDollars(tx.tax_reserve_amount)}
-                      </td>
-
-                      <td className="px-4 py-4 font-bold text-emerald-700">
-                        {formatDollars(tx.available_amount)}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                          {formatStatus(tx.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </div>
-    </main>
-    </>
-  );
-}
-</file>
-
-<file path="components/ShareQrCard.tsx">
-"use client";
-
-import QRCode from "react-qr-code";
-import { useRef, useState } from "react";
-import CopyLinkButton from "@/components/CopyLinkButton";
-
-type Language = "en" | "es";
-
-type ShareQrCardProps = {
-  publicUrl: string;
-  workerName?: string;
-  language?: Language;
-};
-
-export default function ShareQrCard({
-  publicUrl,
-  workerName = "Thankly Worker",
-  language = "en",
-}: ShareQrCardProps) {
-  const qrRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
-
-  const t = {
-    title: language === "en" ? "Share your page" : "Comparte tu QR",
-    description:
-      language === "en"
-        ? "Copy your link, open your page, or download your QR code."
-        : "Copia tu enlace, abre tu página o descarga tu código QR.",
-    publicLink: language === "en" ? "Public Link" : "Enlace público",
-    openPage: language === "en" ? "View Tip Page" : "Ver página de propinas",
-    downloadQr: language === "en" ? "Download QR" : "Descargar QR",
-    share: language === "en" ? "Share" : "Compartir",
-    copied: language === "en" ? "Copied!" : "¡Copiado!",
-    linkHint:
-      language === "en"
-        ? "This link opens your public tip page — share it anywhere your customers can tap or scan."
-        : "Este enlace abre tu página pública de propinas — compártelo donde tus clientes puedan verlo.",
-    shareTitle:
-      language === "en"
-        ? "My Thankly page"
-        : "Mi página de Thankly",
-    shareText:
-      language === "en"
-        ? "Show your appreciation on Thankly"
-        : "Muestra tu agradecimiento en Thankly",
-  };
-
-  async function renderBrandedCardPng(): Promise<Blob | null> {
-    const svg = qrRef.current?.querySelector("svg");
-    if (!svg) return null;
-
-    // Clone with explicit dimensions so the SVG has an intrinsic size
-    // when rasterized (Firefox requires this for drawImage).
-    const clone = svg.cloneNode(true) as SVGSVGElement;
-    clone.setAttribute("width", "160");
-    clone.setAttribute("height", "160");
-
-    const svgData = new XMLSerializer().serializeToString(clone);
-    const svgUrl =
-      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
-
-    const qrImage = new Image();
-    await new Promise<void>((resolve, reject) => {
-      qrImage.onload = () => resolve();
-      qrImage.onerror = () => reject(new Error("QR image failed to load"));
-      qrImage.src = svgUrl;
-    });
-
-    // Layout in logical px matching the on-screen 220px card, scaled 3x for export quality.
-    const S = 3;
-    const W = 220;
-    const H = 320;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = W * S;
-    canvas.height = H * S;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    ctx.scale(S, S);
-
-    function roundedRect(x: number, y: number, w: number, h: number, r: number) {
-      ctx!.beginPath();
-      ctx!.moveTo(x + r, y);
-      ctx!.arcTo(x + w, y, x + w, y + h, r);
-      ctx!.arcTo(x + w, y + h, x, y + h, r);
-      ctx!.arcTo(x, y + h, x, y, r);
-      ctx!.arcTo(x, y, x + w, y, r);
-      ctx!.closePath();
-    }
-
-    // Navy card background
-    roundedRect(0, 0, W, H, 16);
-    ctx.fillStyle = "#0f3f73";
-    ctx.fill();
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-
-    // Wordmark
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 18px system-ui, -apple-system, 'Segoe UI', sans-serif";
-    ctx.fillText("Thankly", W / 2, 24);
-
-    // Subtitle
-    ctx.fillStyle = "#bfdbfe";
-    ctx.font = "400 11px system-ui, -apple-system, 'Segoe UI', sans-serif";
-    ctx.fillText("Worker Finance Platform", W / 2, 48);
-
-    // White QR panel
-    const panelSize = 184;
-    const panelX = (W - panelSize) / 2;
-    const panelY = 71;
-    roundedRect(panelX, panelY, panelSize, panelSize, 12);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-
-    // QR code
-    ctx.drawImage(qrImage, panelX + 12, panelY + 12, 160, 160);
-
-    // Worker name
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "700 12px system-ui, -apple-system, 'Segoe UI', sans-serif";
-    ctx.fillText(workerName, W / 2, panelY + panelSize + 12);
-
-    // Domain
-    ctx.fillStyle = "#93c5fd";
-    ctx.font = "400 10px system-ui, -apple-system, 'Segoe UI', sans-serif";
-    ctx.fillText("getthankly.com", W / 2, panelY + panelSize + 30);
-
-    return new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((blob) => resolve(blob), "image/png")
-    );
-  }
-
-  async function downloadQrCard() {
-    try {
-      const blob = await renderBrandedCardPng();
-
-      if (!blob) {
-        alert("QR code not ready yet.");
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "thankly-qr-card.png";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("QR download error:", error);
-      alert("Could not generate the QR card. Please try again.");
-    }
-  }
-
-  async function shareCard() {
-    try {
-      const blob = await renderBrandedCardPng();
-      if (!blob) return;
-
-      const file = new File([blob], "thankly-qr-card.png", { type: "image/png" });
-
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          title: t.shareTitle,
-          text: t.shareText,
-          files: [file],
-        });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "thankly-qr-card.png";
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      // User cancelling the native share sheet is not an error
-      if ((error as any)?.name === "AbortError") return;
-
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
-  return (
-    <section className="rounded-3xl bg-white p-6 shadow-xl">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{t.description}</p>
-      </div>
-
-      <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_220px] lg:items-center">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs uppercase tracking-wide text-slate-400">
-            {t.publicLink}
-          </p>
-
-          <p className="mt-1 break-all text-lg font-semibold text-slate-900">
-            {publicUrl}
-          </p>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <CopyLinkButton 
-              value={publicUrl}
-              language={language}
-            />
-
-            <a
-              href={publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-2xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
-            >
-              {t.openPage}
-            </a>
-
-            <button
-              type="button"
-              onClick={downloadQrCard}
-              className="rounded-2xl border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
-            >
-              {t.downloadQr}
-            </button>
-
-            <button
-              type="button"
-              onClick={shareCard}
-              className="rounded-2xl border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 transition"
-            >
-              {copied ? t.copied : t.share}
-            </button>
-          </div>
-
-          <p className="mt-3 text-xs text-slate-400">{t.linkHint}</p>
-        </div>
-
-        <div className="flex justify-center">
-          <div
-            ref={qrRef}
-            className="rounded-2xl overflow-hidden"
-            style={{ background: "#0f3f73", padding: "24px", textAlign: "center", width: "220px" }}
-          >
-            <p style={{ color: "#ffffff", fontWeight: 900, fontSize: "18px", margin: "0 0 4px", letterSpacing: "0.5px" }}>Thankly</p>
-            <p style={{ color: "#bfdbfe", fontSize: "11px", margin: "0 0 14px" }}>Worker Finance Platform</p>
-            <div style={{ background: "#ffffff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
-              <QRCode value={publicUrl} size={160} />
-            </div>
-            <p style={{ color: "#ffffff", fontSize: "12px", fontWeight: 700, margin: "12px 0 2px" }}>{workerName}</p>
-            <p style={{ color: "#93c5fd", fontSize: "10px", margin: "0" }}>getthankly.com</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
 }
 </file>
 
@@ -27920,6 +26930,221 @@ export async function POST(req: NextRequest) {
 }
 </file>
 
+<file path="app/globals.css">
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+@keyframes pulseGlow {
+  0% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0.6; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes lightSweep {
+  0% { transform: translateX(-55%); opacity: 0; }
+  8% { opacity: 1; }
+  18% { transform: translateX(135%); opacity: 0; }
+  100% { transform: translateX(135%); opacity: 0; }
+}
+
+@keyframes tapShimmer {
+  0% { transform: translateX(-85%); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateX(90%); opacity: 0; }
+}
+
+@keyframes twinkleFar {
+  0%, 100% {
+    transform: translateY(0px) scale(0.9);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0;
+  }
+  45% {
+    transform: translateY(-4px) scale(1.15);
+    opacity: 0.75;
+  }
+  70% {
+    opacity: 0;
+  }
+}
+
+@keyframes twinkleNear {
+  0%, 100% {
+    transform: translateY(0px) scale(0.9);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0;
+  }
+  42% {
+    transform: translateY(-5px) scale(1.2);
+    opacity: 1;
+  }
+  68% {
+    opacity: 0;
+  }
+}
+
+.particle,
+.particle-near {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.particle {
+  width: 1px;
+  height: 1px;
+  background: rgba(255, 255, 255, 1);
+  box-shadow:
+    0 0 8px rgba(255,255,255,0.65),
+    0 0 18px rgba(191, 219, 254, 0.35),
+    0 0 28px rgba(56, 189, 248, 0.18);
+  animation-name: twinkleFar;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.particle-near {
+  width: 2px;
+  height: 2px;
+  background: rgba(255, 255, 255, 1);
+  box-shadow:
+    0 0 10px rgba(255,255,255,0.95),
+    0 0 22px rgba(147, 197, 253, 0.5),
+    0 0 36px rgba(56, 189, 248, 0.24);
+  animation-name: twinkleNear;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.legal-content h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0D1B2A;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.legal-content h2:first-child {
+  margin-top: 0;
+}
+
+.legal-content h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1B3A6B;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.legal-content p {
+  font-size: 0.95rem;
+  line-height: 1.75;
+  color: #4A5568;
+  margin-bottom: 1rem;
+}
+
+.legal-content ul {
+  margin-bottom: 1.25rem;
+  padding-left: 1.25rem;
+}
+
+.legal-content li {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #4A5568;
+  margin-bottom: 0.5rem;
+  list-style-type: disc;
+}
+
+.legal-content a {
+  color: #00B4D8;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 180, 216, 0.3);
+}
+
+.legal-content a:hover {
+  text-decoration-color: #00B4D8;
+}
+
+.legal-content strong {
+  font-weight: 700;
+  color: #0D1B2A;
+}
+
+.legal-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.875rem;
+}
+
+.legal-content th {
+  text-align: left;
+  font-weight: 700;
+  color: #0D1B2A;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid #E2E8F0;
+}
+
+.legal-content td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #EDF2F7;
+  color: #4A5568;
+}
+
+.legal-content section {
+  margin-bottom: 1rem;
+}
+
+.legal-content .info-box {
+  background: #F0F6FF;
+  border-left: 4px solid #00B4D8;
+  border-radius: 0 12px 12px 0;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  font-size: 0.9rem;
+  color: #1B3A6B;
+  line-height: 1.6;
+}
+
+.legal-content .warning-box {
+  background: #FFF7ED;
+  border-left: 4px solid #F97316;
+  border-radius: 0 12px 12px 0;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  font-size: 0.9rem;
+  color: #7C2D12;
+  line-height: 1.6;
+}
+</file>
+
 <file path="app/privacy/page.tsx">
 import type { Metadata } from 'next'
 import LegalLayout from '@/components/LegalLayout'
@@ -28413,6 +27638,270 @@ export default function TermsPage() {
       </section>
     </LegalLayout>
   )
+}
+</file>
+
+<file path="components/ShareQrCard.tsx">
+"use client";
+
+import QRCode from "react-qr-code";
+import { useRef, useState } from "react";
+import CopyLinkButton from "@/components/CopyLinkButton";
+
+type Language = "en" | "es";
+
+type ShareQrCardProps = {
+  publicUrl: string;
+  workerName?: string;
+  language?: Language;
+};
+
+export default function ShareQrCard({
+  publicUrl,
+  workerName = "Thankly Worker",
+  language = "en",
+}: ShareQrCardProps) {
+  const qrRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const t = {
+    title: language === "en" ? "Share your page" : "Comparte tu QR",
+    description:
+      language === "en"
+        ? "Copy your link, open your page, or download your QR code."
+        : "Copia tu enlace, abre tu página o descarga tu código QR.",
+    publicLink: language === "en" ? "Public Link" : "Enlace público",
+    openPage: language === "en" ? "View Tip Page" : "Ver página de propinas",
+    downloadQr: language === "en" ? "Download QR" : "Descargar QR",
+    share: language === "en" ? "Share" : "Compartir",
+    copied: language === "en" ? "Copied!" : "¡Copiado!",
+    linkHint:
+      language === "en"
+        ? "This link opens your public tip page — share it anywhere your customers can tap or scan."
+        : "Este enlace abre tu página pública de propinas — compártelo donde tus clientes puedan verlo.",
+    shareTitle:
+      language === "en"
+        ? "My Thankly page"
+        : "Mi página de Thankly",
+    shareText:
+      language === "en"
+        ? "Show your appreciation on Thankly"
+        : "Muestra tu agradecimiento en Thankly",
+  };
+
+  async function renderBrandedCardPng(): Promise<Blob | null> {
+    const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return null;
+
+    // Clone with explicit dimensions so the SVG has an intrinsic size
+    // when rasterized (Firefox requires this for drawImage).
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute("width", "160");
+    clone.setAttribute("height", "160");
+
+    const svgData = new XMLSerializer().serializeToString(clone);
+    const svgUrl =
+      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgData);
+
+    const qrImage = new Image();
+    await new Promise<void>((resolve, reject) => {
+      qrImage.onload = () => resolve();
+      qrImage.onerror = () => reject(new Error("QR image failed to load"));
+      qrImage.src = svgUrl;
+    });
+
+    // Layout in logical px matching the on-screen 220px card, scaled 3x for export quality.
+    const S = 3;
+    const W = 220;
+    const H = 320;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W * S;
+    canvas.height = H * S;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.scale(S, S);
+
+    function roundedRect(x: number, y: number, w: number, h: number, r: number) {
+      ctx!.beginPath();
+      ctx!.moveTo(x + r, y);
+      ctx!.arcTo(x + w, y, x + w, y + h, r);
+      ctx!.arcTo(x + w, y + h, x, y + h, r);
+      ctx!.arcTo(x, y + h, x, y, r);
+      ctx!.arcTo(x, y, x + w, y, r);
+      ctx!.closePath();
+    }
+
+    // Navy card background
+    roundedRect(0, 0, W, H, 16);
+    ctx.fillStyle = "#0f3f73";
+    ctx.fill();
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+
+    // Wordmark
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 18px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("Thankly", W / 2, 24);
+
+    // Subtitle
+    ctx.fillStyle = "#bfdbfe";
+    ctx.font = "400 11px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("Worker Finance Platform", W / 2, 48);
+
+    // White QR panel
+    const panelSize = 184;
+    const panelX = (W - panelSize) / 2;
+    const panelY = 71;
+    roundedRect(panelX, panelY, panelSize, panelSize, 12);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+
+    // QR code
+    ctx.drawImage(qrImage, panelX + 12, panelY + 12, 160, 160);
+
+    // Worker name
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 12px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText(workerName, W / 2, panelY + panelSize + 12);
+
+    // Domain
+    ctx.fillStyle = "#93c5fd";
+    ctx.font = "400 10px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillText("getthankly.com", W / 2, panelY + panelSize + 30);
+
+    return new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((blob) => resolve(blob), "image/png")
+    );
+  }
+
+  async function downloadQrCard() {
+    try {
+      const blob = await renderBrandedCardPng();
+
+      if (!blob) {
+        alert("QR code not ready yet.");
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "thankly-qr-card.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("QR download error:", error);
+      alert("Could not generate the QR card. Please try again.");
+    }
+  }
+
+  async function shareCard() {
+    try {
+      const blob = await renderBrandedCardPng();
+      if (!blob) return;
+
+      const file = new File([blob], "thankly-qr-card.png", { type: "image/png" });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: t.shareTitle,
+          text: t.shareText,
+          files: [file],
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "thankly-qr-card.png";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      // User cancelling the native share sheet is not an error
+      if ((error as any)?.name === "AbortError") return;
+
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  return (
+    <section className="rounded-3xl bg-white p-6 shadow-xl">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{t.description}</p>
+      </div>
+
+      <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_220px] lg:items-center">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs uppercase tracking-wide text-slate-400">
+            {t.publicLink}
+          </p>
+
+          <p className="mt-1 break-all text-lg font-semibold text-slate-900">
+            {publicUrl}
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <CopyLinkButton 
+              value={publicUrl}
+              language={language}
+            />
+
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-2xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
+            >
+              {t.openPage}
+            </a>
+
+            <button
+              type="button"
+              onClick={downloadQrCard}
+              className="rounded-2xl border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 transition"
+            >
+              {t.downloadQr}
+            </button>
+
+            <button
+              type="button"
+              onClick={shareCard}
+              className="rounded-2xl border border-violet-300 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 transition"
+            >
+              {copied ? t.copied : t.share}
+            </button>
+          </div>
+
+          <p className="mt-3 text-xs text-slate-400">{t.linkHint}</p>
+        </div>
+
+        <div className="flex justify-center">
+          <div
+            ref={qrRef}
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "#0f3f73", padding: "24px", textAlign: "center", width: "220px" }}
+          >
+            <p style={{ color: "#ffffff", fontWeight: 900, fontSize: "18px", margin: "0 0 4px", letterSpacing: "0.5px" }}>Thankly</p>
+            <p style={{ color: "#bfdbfe", fontSize: "11px", margin: "0 0 14px" }}>Worker Finance Platform</p>
+            <div style={{ background: "#ffffff", borderRadius: "12px", padding: "12px", display: "inline-block" }}>
+              <QRCode value={publicUrl} size={160} />
+            </div>
+            <p style={{ color: "#ffffff", fontSize: "12px", fontWeight: 700, margin: "12px 0 2px" }}>{workerName}</p>
+            <p style={{ color: "#93c5fd", fontSize: "10px", margin: "0" }}>getthankly.com</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 </file>
 
@@ -30055,6 +29544,616 @@ export default function EmailConfirmedPage() {
 }
 </file>
 
+<file path="components/ManageDashboardClient.tsx">
+"use client";
+
+import { useMemo, useState } from "react";
+import ShareQrCard from "@/components/ShareQrCard";
+import EditWorkerProfile from "@/components/EditWorkerProfile";
+import ResumeStripeButton from "@/components/ResumeStripeButton";
+import ManageStripeButton from "@/components/ManageStripeButton";
+import TaxWithholdingCard from "@/components/TaxWithholdingCard";
+import ExportEarningsButton from "@/components/ExportEarningsButton";
+import WebPayoutCard from "@/components/WebPayoutCard";
+import AppNav from "@/components/AppNav";
+
+type Filter = "today" | "week" | "month" | "all" | "custom";
+type Language = "en" | "es";
+
+type Worker = {
+  id: string;
+  full_name: string;
+  email: string;
+  bio: string | null;
+  bio_es: string | null;
+  profile_slug: string;
+  stripe_onboarded: boolean;
+  stripe_account_id: string | null;
+  tax_withholding_rate: number | null;
+  auth_user_id: string;
+};
+
+type Transaction = {
+  id: string;
+  tip_amount: number;
+  fee_amount: number;
+  worker_receives: number;
+  tax_reserve_amount: number;
+  available_amount: number;
+  status: string;
+  created_at: string;
+};
+
+type Props = {
+  worker: Worker;
+  transactions: Transaction[];
+  publicUrl: string;
+};
+
+function formatDollars(cents: number | null | undefined) {
+  return `$${((cents ?? 0) / 100).toFixed(2)}`;
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
+function formatStatus(value: string | null | undefined) {
+  if (!value) return "Unknown";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function isInRange(
+  dateValue: string,
+  filter: Filter,
+  customStartDate: string,
+  customEndDate: string
+) {
+  const txDate = new Date(dateValue);
+  const now = new Date();
+
+  if (filter === "all") return true;
+
+  if (filter === "today") {
+    return txDate.toDateString() === now.toDateString();
+  }
+
+  if (filter === "week") {
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    return txDate >= startOfWeek;
+  }
+
+  if (filter === "month") {
+    return (
+      txDate.getFullYear() === now.getFullYear() &&
+      txDate.getMonth() === now.getMonth()
+    );
+  }
+
+  if (filter === "custom") {
+    if (!customStartDate && !customEndDate) return true;
+
+    const start = customStartDate ? new Date(customStartDate) : null;
+    const end = customEndDate ? new Date(customEndDate) : null;
+
+    if (start) {
+      start.setHours(0, 0, 0, 0);
+    }
+
+    if (end) {
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (start && txDate < start) return false;
+    if (end && txDate > end) return false;
+
+    return true;
+  }
+
+  return true;
+}
+
+export default function ManageDashboardClient({
+  worker,
+  transactions,
+  publicUrl,
+}: Props) {
+  const [language, setLanguage] = useState<Language>("en");
+  const [filter, setFilter] = useState<Filter>("today");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const t = {
+    dashboard:
+      language === "en"
+        ? "Thankly Dashboard"
+        : "Panel de Thankly",
+
+    welcome:
+      language === "en"
+        ? `Welcome, ${worker.full_name}`
+        : `Bienvenido, ${worker.full_name}`,
+
+    subtitle:
+      language === "en"
+        ? "Manage your gratitude page, track earnings, and share your QR code."
+        : "Administra tu página de agradecimiento, revisa tus ingresos y comparte tu código QR.",
+
+    stripeStatus:
+      language === "en"
+        ? "Stripe Status"
+        : "Estado de Stripe",
+
+    ready:
+      language === "en"
+        ? "✅ Ready"
+        : "✅ Listo",
+
+    readyText:
+      language === "en"
+        ? "Ready to receive tips."
+        : "Listo para recibir agradecimientos.",
+
+    setupIncomplete:
+      language === "en"
+        ? "⚠️ Setup incomplete"
+        : "⚠️ Configuración incompleta",
+
+    finishStripe:
+      language === "en"
+        ? "Finish Stripe setup to receive payouts."
+        : "Completa Stripe para recibir pagos.",
+
+    today:
+      language === "en"
+        ? "Today"
+        : "Hoy",
+
+    week:
+      language === "en"
+        ? "This Week"
+        : "Esta semana",
+
+    month:
+      language === "en"
+        ? "This Month"
+        : "Este mes",
+
+    all:
+      language === "en"
+        ? "All Time"
+        : "Todo",
+
+    custom:
+      language === "en"
+        ? "Custom"
+        : "Personalizado",
+
+    from:
+      language === "en"
+        ? "From"
+        : "Desde",
+
+    to:
+      language === "en"
+        ? "To"
+        : "Hasta",
+
+    workerReceives:
+      language === "en"
+        ? "Worker Receives"
+        : "Recibe",
+
+    beforeTax:
+      language === "en"
+        ? "Before tax pocket"
+        : "Antes de ahorro fiscal",
+
+    totalVolume:
+      language === "en"
+      ? "Total Volume"
+      : "Monto total",
+
+    grossProcessed:
+      language === "en"
+        ? "Gross tips processed"
+        : "Agradecimientos procesados",
+
+    totalTips:
+      language === "en"
+        ? "Total Tips"
+        : "Total",
+
+    completedPayments:
+      language === "en"
+        ? "Completed payments"
+        : "Pagos completados",
+
+    avgTip:
+      language === "en"
+        ? "Avg. Tip"
+        : "Promedio",
+
+    perCustomer:
+      language === "en"
+        ? "Per customer"
+        : "Por cliente",
+
+    recentTransactions:
+      language === "en"
+        ? "Recent Transactions"
+        : "Movimientos recientes",
+
+    recentSubtitle:
+      language === "en"
+        ? "Latest completed tips and Thankly fee breakdown."
+        : "Últimos agradecimientos completados y desglose de Thankly.",
+
+    thanklyFees:
+      language === "en"
+        ? "Thankly Fees"
+        : "Ingresos Thankly",
+
+    noTransactions:
+      language === "en"
+        ? "No transactions for this period."
+        : "No hay movimientos en este período.",
+
+    date:
+      language === "en"
+        ? "Date"
+        : "Fecha",
+
+    tip:
+      language === "en"
+        ? "Tip"
+        : "Agradecimiento",
+
+    fee:
+      language === "en"
+        ? "Fee"
+        : "Cargo",
+
+    taxReserve:
+      language === "en"
+        ? "Estimated Tax Pocket"
+        : "Reserva",
+
+    available:
+      language === "en"
+        ? "Safe-to-Spend"
+        : "Disponible",
+
+    status:
+      language === "en"
+        ? "Status"
+      : "Estado",
+    
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) =>
+      isInRange(tx.created_at, filter, customStartDate, customEndDate)
+    );
+  }, [transactions, filter, customStartDate, customEndDate]);
+
+  const totalTips = filteredTransactions.length;
+
+  const totalEarnedCents = filteredTransactions.reduce(
+    (sum, tx) => sum + (tx.worker_receives ?? 0),
+    0
+  );
+
+  const totalVolumeCents = filteredTransactions.reduce(
+    (sum, tx) => sum + (tx.tip_amount ?? 0),
+    0
+  );
+
+  const totalFeesCents = filteredTransactions.reduce(
+    (sum, tx) => sum + (tx.fee_amount ?? 0),
+    0
+  );
+
+  const avgTipCents =
+    totalTips > 0 ? Math.round(totalVolumeCents / totalTips) : 0;
+
+  const filters: { label: string; value: Filter }[] = [
+    { label: t.today, value: "today" },
+    { label: t.week, value: "week" },
+    { label: t.month, value: "month" },
+    { label: t.all, value: "all" },
+    { label: t.custom, value: "custom" },
+  ];
+
+  return (
+    <>
+    <AppNav variant="app" />
+    <div className="bg-[#00B4D8]/15 border-b border-[#00B4D8]/30 px-[5%] py-3 flex items-center justify-between gap-4">
+      <p className="text-sm text-[#0F2347] font-medium">
+        🎉 You're in early! The Thankly app is coming soon to the App Store and Google Play. Manage your account here in the meantime.
+      </p>
+    </div>
+    <main className="min-h-screen bg-slate-100 px-4 py-8">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-sky-800 to-blue-950 p-8 text-white shadow-2xl">
+          <div className="mb-5 flex justify-end">
+            <div className="rounded-full bg-white/10 p-1 text-xs font-semibold text-white backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setLanguage("en")}
+                className={`rounded-full px-3 py-1 ${
+                  language === "en"
+                    ? "bg-white text-sky-700"
+                    : "text-white/80"
+                }`}
+              >
+                English
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLanguage("es")}
+                className={`rounded-full px-3 py-1 ${
+                  language === "es"
+                    ? "bg-white text-sky-700"
+                    : "text-white/80"
+                }`}
+              >
+                Español
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-sky-100">
+                {t.dashboard}
+              </p>
+
+              <h1 className="mt-2 text-4xl font-bold tracking-tight">
+                {t.welcome}
+              </h1>
+
+              <p className="mt-2 max-w-2xl text-sm text-slate-100">
+                {t.subtitle}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-white/15 px-5 py-4 shadow-lg backdrop-blur">
+              <p className="text-xs uppercase tracking-wide text-sky-100">
+                {t.stripeStatus}
+              </p>
+
+              {worker.stripe_onboarded ? (
+                <>
+                  <p className="mt-1 text-lg font-semibold">{t.ready}</p>
+                  <p className="mt-1 text-xs text-sky-100">
+                    {t.readyText}
+                  </p>
+                  <ManageStripeButton language={language} />
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-lg font-semibold">
+                    {t.setupIncomplete}
+                  </p>
+                  <p className="mt-1 text-xs text-sky-100">
+                    {t.finishStripe}
+                  </p>
+
+                  <ResumeStripeButton
+                    accountId={worker.stripe_account_id}
+                    authUserId={worker.auth_user_id}
+                    email={worker.email}
+                    fullName={worker.full_name}
+                    slug={worker.profile_slug}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-4 shadow-xl">
+          <div className="flex flex-wrap gap-2">
+            {filters.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setFilter(item.value)}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  filter === item.value
+                    ? "bg-sky-600 text-white"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {filter === "custom" && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {t.from}
+                </label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {t.to}
+                </label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-3xl border border-emerald-100 border-l-4 border-l-emerald-500 bg-emerald-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-emerald-700">
+              {t.workerReceives}
+            </p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(totalEarnedCents)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.beforeTax}</p>
+          </div>
+
+          <div className="rounded-3xl border border-sky-100 border-l-4 border-l-sky-500 bg-sky-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-sky-700">{t.totalVolume}</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(totalVolumeCents)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.grossProcessed}</p>
+          </div>
+
+          <div className="rounded-3xl border border-amber-100 border-l-4 border-l-amber-500 bg-amber-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-amber-700">{t.totalTips}</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {totalTips}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.completedPayments}</p>
+          </div>
+
+          <div className="rounded-3xl border border-violet-100 border-l-4 border-l-violet-500 bg-violet-50 p-6 shadow-xl">
+            <p className="text-sm font-semibold text-violet-700">{t.avgTip}</p>
+            <p className="mt-2 text-4xl font-bold text-slate-900">
+              {formatDollars(avgTipCents)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">{t.perCustomer}</p>
+          </div>
+        </section>
+
+        <WebPayoutCard
+          stripeOnboarded={worker.stripe_onboarded}
+          language={language}
+        />
+
+        <TaxWithholdingCard
+          workerId={worker.id}
+          initialRate={worker.tax_withholding_rate}
+          totalEarnedCents={totalEarnedCents}
+          language={language}
+        />
+
+        <ShareQrCard publicUrl={publicUrl} workerName={worker.full_name} language={language} />
+
+        <EditWorkerProfile
+          workerId={worker.id}
+          initialName={worker.full_name}
+          initialBio={worker.bio}
+          initialBioEs={worker.bio_es}
+          language={language}
+        />
+
+        <section className="rounded-3xl bg-white p-6 shadow-xl">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {t.recentTransactions}
+              </h2>
+              <p className="text-sm text-slate-500">
+                {t.recentSubtitle}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-2xl bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700">
+                {t.thanklyFees}: {formatDollars(totalFeesCents)}
+              </div>
+
+              <ExportEarningsButton
+                workerName={worker.full_name}
+                transactions={filteredTransactions}
+                language={language}
+              />
+            </div>
+
+          </div>
+
+          {filteredTransactions.length === 0 ? (
+            <p className="mt-6 text-slate-500">
+              {t.noTransactions}
+            </p>
+          ) : (
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">{t.date}</th>
+                    <th className="px-4 py-3 font-semibold">{t.tip}</th>
+                    <th className="px-4 py-3 font-semibold">{t.fee}</th>
+                    <th className="px-4 py-3 font-semibold">{t.workerReceives}</th>
+                    <th className="px-4 py-3 font-semibold">{t.taxReserve}</th>
+                    <th className="px-4 py-3 font-semibold">{t.available}</th>
+                    <th className="px-4 py-3 font-semibold">{t.status}</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredTransactions.map((tx) => (
+                    <tr
+                      key={tx.id}
+                      className="border-b border-slate-100 bg-white even:bg-slate-50 hover:bg-sky-50 transition"
+                    >
+                      <td className="px-4 py-4 text-slate-600">
+                        {formatDate(tx.created_at)}
+                      </td>
+
+                      <td className="px-4 py-4 font-bold text-slate-900">
+                        {formatDollars(tx.tip_amount)}
+                      </td>
+
+                      <td className="px-4 py-4 font-semibold text-slate-700">
+                        {formatDollars(tx.fee_amount)}
+                      </td>
+
+                      <td className="px-4 py-4 font-bold text-slate-900">
+                        {formatDollars(tx.worker_receives)}
+                      </td>
+
+                      <td className="px-4 py-4 font-semibold text-amber-700">
+                        {formatDollars(tx.tax_reserve_amount)}
+                      </td>
+
+                      <td className="px-4 py-4 font-bold text-emerald-700">
+                        {formatDollars(tx.available_amount)}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                          {formatStatus(tx.status)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+    </>
+  );
+}
+</file>
+
 <file path="thankly-mobile/app.json">
 {
   "expo": {
@@ -31145,6 +31244,14 @@ function AuthContent() {
     if (intent === "signin") {
       setView("signin");
       sessionStorage.removeItem("authView");
+      return;
+    }
+
+    const role = new URLSearchParams(window.location.search).get("role");
+    if (role === "business") {
+      setView("business_signup");
+    } else if (role === "worker") {
+      setView("worker_signup");
     }
   }, []);
   // Shared
@@ -31479,10 +31586,370 @@ export default function AuthPage() {
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+type Lang = 'en' | 'es'
+
+const copy = {
+  en: {
+    banner: { flag: '🇪🇸', question: '¿Prefieres español?', action: 'Ver en Español' },
+    nav: {
+      links: [
+        { href: '#how-it-works', label: 'How it works' },
+        { href: '#features', label: 'Features' },
+        { href: '#founding', label: 'Founding 500' },
+        { href: '#business', label: 'For Business' },
+      ],
+      signin: 'Sign in',
+      signup: 'Sign up',
+    },
+    hero: {
+      badge: 'Now accepting Founding 500 members',
+      h1a: 'Your tips.',
+      h1b: 'Your money.',
+      h1c: 'Your future.',
+      sub: 'Thankly is the bilingual financial platform built for service workers. Collect digital tips, track every dollar, and build your financial future — all in one place.',
+      cta1: 'Join Founding 500 — Free',
+      cta2: 'See how it works',
+      stats: [
+        { value: '100%', label: 'of your tip, yours' },
+        { value: '$0', label: 'to get started' },
+        { value: 'EN/ES', label: 'fully bilingual' },
+      ],
+    },
+    phone: {
+      newTip: 'New tip received',
+      keep100: '✓ You keep 100%',
+      payoutSent: 'Payout sent',
+      thisWeek: 'this week',
+      greeting: 'Good evening, Maria 👋',
+      performance: "Today's Performance",
+      metrics: [
+        { label: 'Tips', value: '$142' },
+        { label: 'Txns', value: '8' },
+        { label: 'Net', value: '$136' },
+      ],
+      viewQr: '📱 View QR',
+      payout: '💸 Payout',
+    },
+    how: {
+      eyebrow: 'How it works',
+      h2: 'Up and earning in minutes',
+      sub: 'No cash register needed. No hardware to buy. Just your phone and your Thankly QR code.',
+      steps: [
+        { title: 'Create your profile', desc: 'Sign up free, add your photo, workplace, and personalized bio. Your public tip page is live in minutes.' },
+        { title: 'Connect your bank', desc: 'Securely link your bank account through Stripe Express. Bank-level security, zero hassle.' },
+        { title: 'Share your QR code', desc: 'Display your QR at your table, station, or workspace. Customers scan and tip in seconds.' },
+        { title: 'Get paid instantly', desc: 'Tips hit your Thankly account in real time. Cash out instantly or let it build — your choice.' },
+      ],
+    },
+    features: {
+      eyebrow: 'Built for workers',
+      h2a: 'Everything you need.',
+      h2b: "Nothing you don't.",
+      cards: [
+        { icon: '📱', title: 'Your personal tip page', desc: 'A beautiful public profile at getthankly.com/yourname. Customers scan your QR, see your face, and tip you directly.' },
+        { icon: '💰', title: 'Keep 100% of your tip', desc: 'When customers cover the processing fee, you receive every dollar they intended for you. Zero deductions from your tip.' },
+        { icon: '📊', title: 'Real-time earnings dashboard', desc: 'Track tips by day, week, or month. See trends, top days, and your full transaction history — always current.' },
+        { icon: '🏦', title: 'Instant or standard payouts', desc: 'Need money now? Instant payout in minutes. Or let it accumulate and transfer on your schedule.' },
+        { icon: '🧾', title: 'Estimated Tax Pocket', desc: 'Set your estimated tax rate and Thankly tracks how much to set aside automatically. No surprises at tax time.' },
+        { icon: '📄', title: 'Accounting-grade exports', desc: 'Download professional PDF or Excel reports for any date range. Perfect for tax prep, loan applications, or your own records.' },
+      ],
+    },
+    bilingual: {
+      eyebrow: 'Fully bilingual',
+      h2a: 'Built for the community',
+      h2b: 'that runs hospitality.',
+      sub: 'Thankly is built in English and Spanish from the ground up — not translated, conversion-optimized. Every screen, every notification, every dollar.',
+      cta: 'Join Free — Únete gratis',
+      cards: [
+        { flag: '🇺🇸', lang: 'English', text: '"You just made Maria\'s day!"', sub: 'She received your full $20. Zero fees deducted.' },
+        { flag: '🌎', lang: 'Español', text: '"¡Acabas de alegrarle el día a María!"', sub: 'Recibió tu apoyo completo de $20. Sin deducciones.' },
+        { flag: '💳', lang: 'Tip page copy', text: '"Apoya a María" not just "Leave a tip"', sub: 'Warm, conversion-optimized Spanish throughout' },
+      ],
+    },
+    founding: {
+      eyebrow: 'Founding 500',
+      h2a: 'Be one of the first.',
+      h2b: 'Lock your rate forever.',
+      sub: 'The first 500 workers to join Thankly become Founding Members — with permanent benefits that standard members never get.',
+      perks: [
+        { bold: '2% platform fee for life', rest: ' — locked permanently vs. 4% standard rate' },
+        { bold: 'Founding Member badge', rest: ' on your public profile — permanent' },
+        { bold: 'Monthly referral contest', rest: ' — $200 / $100 / $50 cash prizes' },
+        { bold: 'Premium QR card', rest: ' — physical status card for your workspace' },
+        { bold: 'Early access', rest: ' to every new feature before public release' },
+      ],
+      cta: "Claim your spot — It's free",
+      spotsTitle: 'Founding Member Spots',
+      spotsSub: 'Limited. First come, first served.',
+      spotsRemaining: '383 spots remaining',
+    },
+    business: {
+      eyebrow: 'For businesses',
+      h2a: 'Give your team a',
+      h2b: 'financial edge.',
+      sub: 'Deploy Thankly across your entire staff in minutes. No hardware. No integration. Workers are live the same day.',
+      features: [
+        { icon: '👥', title: 'Team dashboard', desc: 'See all workers, combined tip volume, and team performance in one view.' },
+        { icon: '📊', title: 'Combined reports', desc: 'Export PDF or Excel reports for your entire team by date range — ready for accounting.' },
+        { icon: '🔗', title: 'Instant team invites', desc: 'Share one invite link or QR code — workers scan, join your team, and can receive tips the same shift.' },
+      ],
+      pricing: 'Free for your business — no hardware, no contracts, no per-seat fees. Workers keep their standard Thankly rate.',
+      cta1: 'Create a business account',
+      cta2: 'Talk to us',
+      report: {
+        title: 'Team Report — June 2026',
+        badge: 'PDF Ready',
+        rows: [
+          { label: 'Total tips collected', value: '$12,847.50' },
+          { label: 'Active workers', value: '23' },
+          { label: 'Total transactions', value: '1,204' },
+          { label: 'Avg tip per transaction', value: '$10.67' },
+          { label: 'Workers paid out', value: '23 / 23', green: true },
+        ],
+        exportPdf: '⬇ Export PDF',
+        exportExcel: '⬇ Export Excel',
+      },
+    },
+    cta: {
+      h2a: 'Ready to take control',
+      h2b: 'of your tips?',
+      sub: 'Join Thankly free. No monthly fees. No hardware. Just your money — organized, tracked, and paid out on your terms.',
+      cta1: 'Get started free',
+      cta2: 'Sign in',
+    },
+    faq: {
+      eyebrow: 'FAQ',
+      h2: 'Questions, answered.',
+      items: [
+        { q: 'How much does Thankly cost?', a: 'Free to join, no monthly fees. Thankly takes a small platform fee per tip — Founding 500 members lock in 2% for life vs. the 4% standard rate. Customers can choose to cover processing fees so you keep 100% of your tip.' },
+        { q: 'How fast do I get my money?', a: 'Tips land in your Thankly balance in real time. Cash out with an instant payout in minutes, or a free standard payout that arrives in 1–2 business days.' },
+        { q: 'Do I need special hardware?', a: 'No. Your QR code works from your phone screen, a printed card, or a sticker at your station. Customers scan with their phone camera — they don\'t need to download anything to tip you.' },
+        { q: 'Does Thankly withhold my taxes?', a: 'No — the Tax Pocket is an estimation tool, not withholding. Set your estimated rate and Thankly tracks how much of each tip to set aside, plus gives you professional reports for tax season. Thankly doesn\'t provide tax advice.' },
+        { q: 'Is Thankly really bilingual?', a: 'Yes — English and Spanish are built in from the ground up: your dashboard, your public tip page, notifications, everything.' },
+        { q: 'I run a business — can my whole team use it?', a: 'Yes. Create a free business account, share one invite link or QR code, and your team can be live the same shift — with a combined dashboard and exportable team reports.' },
+      ],
+    },
+    footer: {
+      tagline: 'The bilingual financial platform for tipped hospitality workers. Your tips. Your records. Your money under your control.',
+      columns: [
+        {
+          title: 'Product',
+          links: [
+            { href: '#how-it-works', label: 'How it works' },
+            { href: '#features', label: 'Features' },
+            { href: '#founding', label: 'Founding 500' },
+            { href: '#business', label: 'For Business' },
+          ],
+        },
+        {
+          title: 'Support',
+          links: [
+            { href: 'mailto:hello@getthankly.com', label: 'Contact us' },
+            { href: 'mailto:support@getthankly.com', label: 'support@getthankly.com' },
+            { href: 'mailto:legal@getthankly.com', label: 'legal@getthankly.com' },
+          ],
+        },
+        {
+          title: 'Legal',
+          links: [
+            { href: '/privacy', label: 'Privacy Policy' },
+            { href: '/terms', label: 'Terms of Service' },
+            { href: '/disclosures', label: 'Disclosures' },
+          ],
+        },
+      ],
+      copyright: '© 2026 Thankly LLC. All rights reserved. Orlando, Florida.',
+      legalLinks: [
+        { href: '/privacy', label: 'Privacy' },
+        { href: '/terms', label: 'Terms' },
+        { href: '/disclosures', label: 'Disclosures' },
+      ],
+    },
+  },
+  es: {
+    banner: { flag: '🇺🇸', question: 'Prefer English?', action: 'View in English' },
+    nav: {
+      links: [
+        { href: '#how-it-works', label: 'Cómo funciona' },
+        { href: '#features', label: 'Funciones' },
+        { href: '#founding', label: 'Founding 500' },
+        { href: '#business', label: 'Para negocios' },
+      ],
+      signin: 'Inicia sesión',
+      signup: 'Regístrate',
+    },
+    hero: {
+      badge: 'Aceptando miembros del Founding 500',
+      h1a: 'Tus propinas.',
+      h1b: 'Tu dinero.',
+      h1c: 'Tu futuro.',
+      sub: 'Thankly es la plataforma financiera bilingüe creada para trabajadores de servicio. Recibe propinas digitales, controla cada dólar y construye tu futuro financiero — todo en un solo lugar.',
+      cta1: 'Únete al Founding 500 — Gratis',
+      cta2: 'Mira cómo funciona',
+      stats: [
+        { value: '100%', label: 'de tu propina, tuya' },
+        { value: '$0', label: 'para empezar' },
+        { value: 'EN/ES', label: 'totalmente bilingüe' },
+      ],
+    },
+    phone: {
+      newTip: 'Nueva propina recibida',
+      keep100: '✓ Te quedas con el 100%',
+      payoutSent: 'Pago enviado',
+      thisWeek: 'esta semana',
+      greeting: 'Buenas noches, María 👋',
+      performance: 'Rendimiento de hoy',
+      metrics: [
+        { label: 'Propinas', value: '$142' },
+        { label: 'Trans.', value: '8' },
+        { label: 'Neto', value: '$136' },
+      ],
+      viewQr: '📱 Ver QR',
+      payout: '💸 Retiro',
+    },
+    how: {
+      eyebrow: 'Cómo funciona',
+      h2: 'Empieza a ganar en minutos',
+      sub: 'No necesitas caja registradora ni comprar equipo. Solo tu teléfono y tu código QR de Thankly.',
+      steps: [
+        { title: 'Crea tu perfil', desc: 'Regístrate gratis, agrega tu foto, tu lugar de trabajo y tu bio personalizada. Tu página pública de propinas queda lista en minutos.' },
+        { title: 'Conecta tu banco', desc: 'Vincula tu cuenta bancaria de forma segura con Stripe Express. Seguridad de nivel bancario, sin complicaciones.' },
+        { title: 'Comparte tu código QR', desc: 'Muestra tu QR en tu mesa, estación o lugar de trabajo. Tus clientes escanean y te dan propina en segundos.' },
+        { title: 'Recibe tu dinero al instante', desc: 'Las propinas llegan a tu cuenta de Thankly en tiempo real. Retira al instante o deja que crezca — tú decides.' },
+      ],
+    },
+    features: {
+      eyebrow: 'Hecho para trabajadores',
+      h2a: 'Todo lo que necesitas.',
+      h2b: 'Nada de lo que no.',
+      cards: [
+        { icon: '📱', title: 'Tu página personal de propinas', desc: 'Un perfil público en getthankly.com/tunombre. Tus clientes escanean tu QR, ven tu cara y te dan propina directamente.' },
+        { icon: '💰', title: 'Quédate con el 100% de tu propina', desc: 'Cuando el cliente cubre la tarifa de procesamiento, recibes cada dólar que quiso darte. Cero deducciones de tu propina.' },
+        { icon: '📊', title: 'Panel de ganancias en tiempo real', desc: 'Sigue tus propinas por día, semana o mes. Mira tendencias, tus mejores días y todo tu historial de transacciones — siempre al día.' },
+        { icon: '🏦', title: 'Retiros instantáneos o estándar', desc: '¿Necesitas dinero ya? Retiro instantáneo en minutos. O acumula y transfiere cuando tú quieras.' },
+        { icon: '🧾', title: 'Tax Pocket estimado', desc: 'Define tu tasa estimada de impuestos y Thankly calcula cuánto apartar automáticamente. Sin sorpresas en la temporada de impuestos.' },
+        { icon: '📄', title: 'Reportes nivel contabilidad', desc: 'Descarga reportes profesionales en PDF o Excel para cualquier rango de fechas. Perfectos para tus impuestos, solicitudes de préstamo o tus propios registros.' },
+      ],
+    },
+    bilingual: {
+      eyebrow: 'Totalmente bilingüe',
+      h2a: 'Creado para la comunidad',
+      h2b: 'que mueve la hospitalidad.',
+      sub: 'Thankly está hecho en inglés y español desde cero — no traducido, optimizado para conversión. Cada pantalla, cada notificación, cada dólar.',
+      cta: 'Únete gratis — Join Free',
+      cards: [
+        { flag: '🇺🇸', lang: 'English', text: '"You just made Maria\'s day!"', sub: 'She received your full $20. Zero fees deducted.' },
+        { flag: '🌎', lang: 'Español', text: '"¡Acabas de alegrarle el día a María!"', sub: 'Recibió tu apoyo completo de $20. Sin deducciones.' },
+        { flag: '💳', lang: 'Texto de tu página', text: '"Apoya a María", no solo "Leave a tip"', sub: 'Español cálido y natural en toda la plataforma' },
+      ],
+    },
+    founding: {
+      eyebrow: 'Founding 500',
+      h2a: 'Sé de los primeros.',
+      h2b: 'Asegura tu tarifa para siempre.',
+      sub: 'Los primeros 500 trabajadores en unirse a Thankly se convierten en Miembros Fundadores — con beneficios permanentes que los miembros estándar nunca tendrán.',
+      perks: [
+        { bold: 'Tarifa de plataforma del 2% de por vida', rest: ' — asegurada permanentemente vs. la tarifa estándar del 4%' },
+        { bold: 'Insignia de Miembro Fundador', rest: ' en tu perfil público — permanente' },
+        { bold: 'Concurso mensual de referidos', rest: ' — premios en efectivo de $200 / $100 / $50' },
+        { bold: 'Tarjeta QR premium', rest: ' — tarjeta física para tu lugar de trabajo' },
+        { bold: 'Acceso anticipado', rest: ' a cada nueva función antes del lanzamiento público' },
+      ],
+      cta: 'Reclama tu lugar — Es gratis',
+      spotsTitle: 'Lugares de Miembro Fundador',
+      spotsSub: 'Limitados. Por orden de llegada.',
+      spotsRemaining: 'Quedan 383 lugares',
+    },
+    business: {
+      eyebrow: 'Para negocios',
+      h2a: 'Dale a tu equipo una',
+      h2b: 'ventaja financiera.',
+      sub: 'Implementa Thankly con todo tu personal en minutos. Sin equipo especial. Sin integraciones. Tus trabajadores quedan activos el mismo día.',
+      features: [
+        { icon: '👥', title: 'Panel de equipo', desc: 'Mira a todos tus trabajadores, el volumen combinado de propinas y el rendimiento del equipo en una sola vista.' },
+        { icon: '📊', title: 'Reportes combinados', desc: 'Exporta reportes en PDF o Excel de todo tu equipo por rango de fechas — listos para contabilidad.' },
+        { icon: '🔗', title: 'Invitaciones instantáneas', desc: 'Comparte un enlace o código QR de invitación — tus trabajadores escanean, se unen a tu equipo y pueden recibir propinas el mismo turno.' },
+      ],
+      pricing: 'Gratis para tu negocio — sin equipo especial, sin contratos, sin costo por persona. Tus trabajadores mantienen su tarifa estándar de Thankly.',
+      cta1: 'Crea una cuenta de negocio',
+      cta2: 'Escríbenos',
+      report: {
+        title: 'Reporte de equipo — Junio 2026',
+        badge: 'PDF listo',
+        rows: [
+          { label: 'Propinas totales', value: '$12,847.50' },
+          { label: 'Trabajadores activos', value: '23' },
+          { label: 'Transacciones totales', value: '1,204' },
+          { label: 'Propina promedio', value: '$10.67' },
+          { label: 'Trabajadores pagados', value: '23 / 23', green: true },
+        ],
+        exportPdf: '⬇ Exportar PDF',
+        exportExcel: '⬇ Exportar Excel',
+      },
+    },
+    cta: {
+      h2a: '¿Listo para tomar el control',
+      h2b: 'de tus propinas?',
+      sub: 'Únete a Thankly gratis. Sin mensualidades. Sin equipo especial. Solo tu dinero — organizado, registrado y pagado en tus términos.',
+      cta1: 'Empieza gratis',
+      cta2: 'Inicia sesión',
+    },
+    faq: {
+      eyebrow: 'Preguntas frecuentes',
+      h2: 'Tus dudas, resueltas.',
+      items: [
+        { q: '¿Cuánto cuesta Thankly?', a: 'Unirte es gratis y no hay mensualidades. Thankly cobra una pequeña tarifa de plataforma por propina — los miembros del Founding 500 aseguran el 2% de por vida vs. la tarifa estándar del 4%. Tus clientes pueden cubrir la tarifa de procesamiento para que recibas el 100% de tu propina.' },
+        { q: '¿Qué tan rápido recibo mi dinero?', a: 'Las propinas llegan a tu saldo de Thankly en tiempo real. Retira al instante en minutos, o con un retiro estándar gratis que llega en 1–2 días hábiles.' },
+        { q: '¿Necesito equipo especial?', a: 'No. Tu código QR funciona desde la pantalla de tu teléfono, una tarjeta impresa o una calcomanía en tu estación. Tus clientes escanean con la cámara de su teléfono — no necesitan descargar nada para darte propina.' },
+        { q: '¿Thankly retiene mis impuestos?', a: 'No — el Tax Pocket es una herramienta de estimación, no una retención. Define tu tasa estimada y Thankly calcula cuánto apartar de cada propina, además de darte reportes profesionales para la temporada de impuestos. Thankly no ofrece asesoría fiscal.' },
+        { q: '¿Thankly es realmente bilingüe?', a: 'Sí — inglés y español están integrados desde cero: tu panel, tu página pública de propinas, tus notificaciones, todo.' },
+        { q: 'Tengo un negocio — ¿puede usarlo todo mi equipo?', a: 'Sí. Crea una cuenta de negocio gratis, comparte un enlace o código QR de invitación, y tu equipo puede estar activo el mismo turno — con panel combinado y reportes de equipo exportables.' },
+      ],
+    },
+    footer: {
+      tagline: 'La plataforma financiera bilingüe para trabajadores de hospitalidad que reciben propinas. Tus propinas. Tus registros. Tu dinero bajo tu control.',
+      columns: [
+        {
+          title: 'Producto',
+          links: [
+            { href: '#how-it-works', label: 'Cómo funciona' },
+            { href: '#features', label: 'Funciones' },
+            { href: '#founding', label: 'Founding 500' },
+            { href: '#business', label: 'Para negocios' },
+          ],
+        },
+        {
+          title: 'Soporte',
+          links: [
+            { href: 'mailto:hello@getthankly.com', label: 'Contáctanos' },
+            { href: 'mailto:support@getthankly.com', label: 'support@getthankly.com' },
+            { href: 'mailto:legal@getthankly.com', label: 'legal@getthankly.com' },
+          ],
+        },
+        {
+          title: 'Legal',
+          links: [
+            { href: '/privacy', label: 'Política de privacidad' },
+            { href: '/terms', label: 'Términos de servicio' },
+            { href: '/disclosures', label: 'Divulgaciones' },
+          ],
+        },
+      ],
+      copyright: '© 2026 Thankly LLC. Todos los derechos reservados. Orlando, Florida.',
+      legalLinks: [
+        { href: '/privacy', label: 'Privacidad' },
+        { href: '/terms', label: 'Términos' },
+        { href: '/disclosures', label: 'Divulgaciones' },
+      ],
+    },
+  },
+} as const
 
 export default function HomePage() {
-  const fadeRefs = useRef<HTMLElement[]>([])
+  const [lang, setLang] = useState<Lang>('en')
+  const c = copy[lang]
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -31498,17 +31965,21 @@ export default function HomePage() {
     )
     document.querySelectorAll('.fade-up').forEach((el) => observer.observe(el))
     return () => observer.disconnect()
-  }, [])
+  }, [lang])
 
   return (
     <div className="overflow-x-hidden">
 
-      {/* LANGUAGE BANNER */}
+      {/* LANGUAGE BANNER — toggles the whole page */}
       <div className="bg-[#00B4D8]/10 border-b border-[#00B4D8]/20 py-2 px-[5%] text-center text-sm text-[#4A5568]">
-        🇪🇸 ¿Prefieres español?{' '}
-        <a href="#español" className="text-[#1B3A6B] font-bold">
-          Ver en Español
-        </a>
+        {c.banner.flag} {c.banner.question}{' '}
+        <button
+          type="button"
+          onClick={() => setLang(lang === 'en' ? 'es' : 'en')}
+          className="text-[#1B3A6B] font-bold underline-offset-2 hover:underline"
+        >
+          {c.banner.action}
+        </button>
       </div>
 
       {/* NAV */}
@@ -31518,12 +31989,7 @@ export default function HomePage() {
           Thankly
         </Link>
         <ul className="flex items-center gap-4 md:gap-8 list-none">
-          {[
-            { href: '#how-it-works', label: 'How it works' },
-            { href: '#features', label: 'Features' },
-            { href: '#founding', label: 'Founding 500' },
-            { href: '#business', label: 'For Business' },
-          ].map((link) => (
+          {c.nav.links.map((link) => (
             <li key={link.href} className="hidden md:block">
               <a href={link.href} className="text-white/80 text-sm font-medium hover:text-white transition-colors">
                 {link.label}
@@ -31535,7 +32001,7 @@ export default function HomePage() {
               href="/auth/signin"
               className="text-white/80 text-sm font-medium hover:text-white transition-colors"
             >
-              Sign in
+              {c.nav.signin}
             </a>
           </li>
           <li>
@@ -31543,7 +32009,7 @@ export default function HomePage() {
               href="/auth"
               className="bg-[#00B4D8] text-[#0F2347] font-bold text-sm px-5 py-2 rounded-full hover:bg-[#90E0EF] transition-colors"
             >
-              Sign up
+              {c.nav.signup}
             </a>
           </li>
         </ul>
@@ -31561,17 +32027,17 @@ export default function HomePage() {
           <div>
             <div className="inline-flex items-center gap-2 bg-[#00B4D8]/15 border border-[#00B4D8]/30 text-[#00B4D8] text-xs font-bold tracking-widest uppercase px-4 py-1.5 rounded-full mb-6">
               <span className="w-1.5 h-1.5 bg-[#00B4D8] rounded-full animate-pulse" />
-              Now accepting Founding 500 members
+              {c.hero.badge}
             </div>
 
             <h1 className="text-5xl md:text-6xl font-black text-white leading-[1.05] tracking-tight mb-6">
-              Your tips.<br />
-              <span className="text-[#00B4D8]">Your money.</span><br />
-              Your future.
+              {c.hero.h1a}<br />
+              <span className="text-[#00B4D8]">{c.hero.h1b}</span><br />
+              {c.hero.h1c}
             </h1>
 
             <p className="text-lg text-white/75 leading-relaxed mb-10 max-w-[480px]">
-              Thankly is the bilingual financial platform built for service workers. Collect digital tips, track every dollar, and build your financial future — all in one place.
+              {c.hero.sub}
             </p>
 
             <div className="flex flex-wrap gap-4">
@@ -31579,24 +32045,20 @@ export default function HomePage() {
                 href="/auth"
                 className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold text-base px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,180,216,0.35)] transition-all"
               >
-                Join Founding 500 — Free
+                {c.hero.cta1}
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
               </a>
               <a
                 href="#how-it-works"
                 className="inline-flex items-center gap-2 bg-transparent text-white font-bold text-base px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 hover:bg-white/8 transition-all"
               >
-                See how it works
+                {c.hero.cta2}
               </a>
             </div>
 
             <div className="flex gap-8 mt-12 pt-10 border-t border-white/10">
-              {[
-                { value: '100%', label: 'of your tip, yours' },
-                { value: '$0', label: 'to get started' },
-                { value: 'EN/ES', label: 'fully bilingual' },
-              ].map((stat) => (
-                <div key={stat.label}>
+              {c.hero.stats.map((stat, i) => (
+                <div key={i}>
                   <div className="text-3xl font-black text-white tracking-tight">{stat.value}</div>
                   <div className="text-xs text-white/55 mt-0.5 font-medium">{stat.label}</div>
                 </div>
@@ -31611,17 +32073,17 @@ export default function HomePage() {
               <div className="absolute top-16 -right-14 bg-white rounded-2xl px-4 py-3 shadow-2xl w-44 animate-[float_3s_ease-in-out_infinite] z-10">
                 <div className="flex items-center gap-1 text-xs text-[#718096] mb-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full" />
-                  New tip received
+                  {c.phone.newTip}
                 </div>
                 <div className="text-2xl font-black text-[#1B3A6B]">$25.00</div>
-                <div className="text-xs text-green-600 font-semibold">✓ You keep 100%</div>
+                <div className="text-xs text-green-600 font-semibold">{c.phone.keep100}</div>
               </div>
 
               {/* Payout badge */}
               <div className="absolute bottom-24 -left-16 bg-[#1B3A6B] text-white rounded-xl px-4 py-2.5 shadow-2xl text-xs font-bold animate-[float_3s_ease-in-out_1.5s_infinite] z-10 whitespace-nowrap">
-                Payout sent
+                {c.phone.payoutSent}
                 <span className="text-[#00B4D8] text-base font-black block">$847.50</span>
-                this week
+                {c.phone.thisWeek}
               </div>
 
               {/* Phone frame */}
@@ -31642,19 +32104,15 @@ export default function HomePage() {
                     👩
                   </div>
 
-                  <p className="text-white font-bold text-sm text-center mb-0.5">Good evening, Maria 👋</p>
+                  <p className="text-white font-bold text-sm text-center mb-0.5">{c.phone.greeting}</p>
                   <p className="text-white/70 text-xs text-center mb-2">Cviche 305 📍</p>
 
                   {/* Card */}
                   <div className="bg-white rounded-2xl p-3 shadow-lg">
-                    <p className="text-xs font-black text-center text-[#0D1B2A] mb-2">Today's Performance</p>
+                    <p className="text-xs font-black text-center text-[#0D1B2A] mb-2">{c.phone.performance}</p>
                     <div className="grid grid-cols-3 gap-1 mb-3">
-                      {[
-                        { label: 'Tips', value: '$142' },
-                        { label: 'Txns', value: '8' },
-                        { label: 'Net', value: '$136' },
-                      ].map((m) => (
-                        <div key={m.label} className="text-center">
+                      {c.phone.metrics.map((m, i) => (
+                        <div key={i} className="text-center">
                           <div className="text-[10px] text-[#718096]">{m.label}</div>
                           <div className="text-sm font-black text-[#0D1B2A]">{m.value}</div>
                         </div>
@@ -31674,8 +32132,8 @@ export default function HomePage() {
 
                   {/* Buttons */}
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="bg-[#e8f0fe] rounded-xl py-2 text-center text-[10px] font-bold text-[#1B3A6B]">📱 View QR</div>
-                    <div className="bg-[#e8f0fe] rounded-xl py-2 text-center text-[10px] font-bold text-[#1B3A6B]">💸 Payout</div>
+                    <div className="bg-[#e8f0fe] rounded-xl py-2 text-center text-[10px] font-bold text-[#1B3A6B]">{c.phone.viewQr}</div>
+                    <div className="bg-[#e8f0fe] rounded-xl py-2 text-center text-[10px] font-bold text-[#1B3A6B]">{c.phone.payout}</div>
                   </div>
                 </div>
               </div>
@@ -31688,26 +32146,24 @@ export default function HomePage() {
       <section className="bg-[#F0F6FF] py-24 px-[5%]" id="how-it-works">
         <div className="max-w-[1200px] mx-auto">
           <div className="text-center mb-16 fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">How it works</p>
-            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight mb-4">Up and earning in minutes</h2>
-            <p className="text-[#4A5568] text-lg leading-relaxed max-w-xl mx-auto">No cash register needed. No hardware to buy. Just your phone and your Thankly QR code.</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.how.eyebrow}</p>
+            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight mb-4">{c.how.h2}</h2>
+            <p className="text-[#4A5568] text-lg leading-relaxed max-w-xl mx-auto">{c.how.sub}</p>
           </div>
 
           <div className="grid md:grid-cols-4 gap-8">
-            {[
-              { n: '1', title: 'Create your profile', desc: 'Sign up free, add your photo, workplace, and personalized bio. Your public tip page is live in minutes.', bg: 'bg-[#1B3A6B]' },
-              { n: '2', title: 'Connect your bank', desc: 'Securely link your bank account through Stripe Express. Bank-level security, zero hassle.', bg: 'bg-gradient-to-br from-[#1B3A6B] to-[#00B4D8]' },
-              { n: '3', title: 'Share your QR code', desc: 'Display your QR at your table, station, or workspace. Customers scan and tip in seconds.', bg: 'bg-gradient-to-br from-[#00B4D8] to-[#254d8f]' },
-              { n: '4', title: 'Get paid instantly', desc: 'Tips hit your Thankly account in real time. Cash out instantly or let it build — your choice.', bg: 'bg-[#00B4D8]' },
-            ].map((step, i) => (
-              <div key={i} className="text-center fade-up opacity-0 translate-y-6 transition-all duration-700" style={{ transitionDelay: `${i * 100}ms` }}>
-                <div className={`w-16 h-16 rounded-full ${step.bg} text-white text-xl font-black flex items-center justify-center mx-auto mb-5`}>
-                  {step.n}
+            {c.how.steps.map((step, i) => {
+              const bgs = ['bg-[#1B3A6B]', 'bg-gradient-to-br from-[#1B3A6B] to-[#00B4D8]', 'bg-gradient-to-br from-[#00B4D8] to-[#254d8f]', 'bg-[#00B4D8]']
+              return (
+                <div key={i} className="text-center fade-up opacity-0 translate-y-6 transition-all duration-700" style={{ transitionDelay: `${i * 100}ms` }}>
+                  <div className={`w-16 h-16 rounded-full ${bgs[i]} text-white text-xl font-black flex items-center justify-center mx-auto mb-5`}>
+                    {i + 1}
+                  </div>
+                  <h3 className="font-extrabold text-[#0D1B2A] mb-2">{step.title}</h3>
+                  <p className="text-sm text-[#4A5568] leading-relaxed">{step.desc}</p>
                 </div>
-                <h3 className="font-extrabold text-[#0D1B2A] mb-2">{step.title}</h3>
-                <p className="text-sm text-[#4A5568] leading-relaxed">{step.desc}</p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>
@@ -31716,19 +32172,12 @@ export default function HomePage() {
       <section className="py-24 px-[5%]" id="features">
         <div className="max-w-[1200px] mx-auto">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700 mb-14">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">Built for workers</p>
-            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight">Everything you need.<br />Nothing you don't.</h2>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.features.eyebrow}</p>
+            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight">{c.features.h2a}<br />{c.features.h2b}</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {[
-              { icon: '📱', title: 'Your personal tip page', desc: 'A beautiful public profile at getthankly.com/yourname. Customers scan your QR, see your face, and tip you directly.' },
-              { icon: '💰', title: 'Keep 100% of your tip', desc: 'When customers cover the processing fee, you receive every dollar they intended for you. Zero deductions from your tip.' },
-              { icon: '📊', title: 'Real-time earnings dashboard', desc: 'Track tips by day, week, or month. See trends, top days, and your full transaction history — always current.' },
-              { icon: '🏦', title: 'Instant or standard payouts', desc: 'Need money now? Instant payout in minutes. Or let it accumulate and transfer on your schedule.' },
-              { icon: '🧾', title: 'Estimated Tax Pocket', desc: 'Set your estimated tax rate and Thankly tracks how much to set aside automatically. No surprises at tax time.' },
-              { icon: '📄', title: 'Accounting-grade exports', desc: 'Download professional PDF or Excel reports for any date range. Perfect for tax prep, loan applications, or your own records.' },
-            ].map((f, i) => (
+            {c.features.cards.map((f, i) => (
               <div
                 key={i}
                 className="bg-white border border-slate-200 rounded-2xl p-8 hover:border-[#00B4D8] hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,180,216,0.12)] transition-all fade-up opacity-0 translate-y-6 duration-700"
@@ -31748,23 +32197,19 @@ export default function HomePage() {
         <div className="absolute top-[-50%] right-[-20%] w-[700px] h-[700px] bg-[#00B4D8]/10 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-20 items-center relative z-10">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">Fully bilingual</p>
-            <h2 className="text-4xl font-black text-white tracking-tight leading-tight mb-6">Built for the community<br />that runs hospitality.</h2>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.bilingual.eyebrow}</p>
+            <h2 className="text-4xl font-black text-white tracking-tight leading-tight mb-6">{c.bilingual.h2a}<br />{c.bilingual.h2b}</h2>
             <p className="text-white/70 text-lg leading-relaxed mb-8">
-              Thankly is built in English and Spanish from the ground up — not translated, conversion-optimized. Every screen, every notification, every dollar.
+              {c.bilingual.sub}
             </p>
             <a href="#founding" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] transition-colors">
-               Join Free — Únete gratis
+              {c.bilingual.cta}
             </a>
           </div>
 
           <div className="flex flex-col gap-4 fade-up opacity-0 translate-y-6 transition-all duration-700">
-            {[
-              { flag: '🇺🇸', lang: 'English', text: '"You just made Maria\'s day!"', sub: 'She received your full $20. Zero fees deducted.' },
-              { flag: '🌎', lang: 'Español', text: '"¡Acabas de alegrarle el día a María!"', sub: 'Recibió tu apoyo completo de $20. Sin deducciones.' },
-              { flag: '💳', lang: 'Tip page copy', text: '"Apoya a María" not just "Leave a tip"', sub: 'Warm, conversion-optimized Spanish throughout' },
-            ].map((card) => (
-              <div key={card.lang} className="bg-white/8 border border-white/12 rounded-2xl px-6 py-5 flex items-start gap-4">
+            {c.bilingual.cards.map((card, i) => (
+              <div key={i} className="bg-white/8 border border-white/12 rounded-2xl px-6 py-5 flex items-start gap-4">
                 <span className="text-4xl">{card.flag}</span>
                 <div>
                   <p className="text-white/50 text-xs mb-1">{card.lang}</p>
@@ -31781,18 +32226,12 @@ export default function HomePage() {
       <section className="bg-[#F0F6FF] py-24 px-[5%]" id="founding">
         <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-20 items-center">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">Founding 500</p>
-            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight leading-tight mb-6">Be one of the first.<br />Lock your rate forever.</h2>
-            <p className="text-[#4A5568] text-lg leading-relaxed mb-8">The first 500 workers to join Thankly become Founding Members — with permanent benefits that standard members never get.</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.founding.eyebrow}</p>
+            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight leading-tight mb-6">{c.founding.h2a}<br />{c.founding.h2b}</h2>
+            <p className="text-[#4A5568] text-lg leading-relaxed mb-8">{c.founding.sub}</p>
 
             <ul className="flex flex-col gap-4 mb-8">
-              {[
-                { bold: '2% platform fee for life', rest: ' — locked permanently vs. 4% standard rate' },
-                { bold: 'Founding Member badge', rest: ' on your public profile — permanent' },
-                { bold: 'Monthly referral contest', rest: ' — $200 / $100 / $50 cash prizes' },
-                { bold: 'Premium QR card', rest: ' — physical status card for your workspace' },
-                { bold: 'Early access', rest: ' to every new feature before public release' },
-              ].map((perk, i) => (
+              {c.founding.perks.map((perk, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <div className="w-5 h-5 rounded-full bg-[#00B4D8]/15 border border-[#00B4D8] flex items-center justify-center flex-shrink-0 mt-0.5 text-[#00B4D8] text-xs font-bold">✓</div>
                   <span className="text-[#0D1B2A] text-[0.95rem]"><strong>{perk.bold}</strong>{perk.rest}</span>
@@ -31801,7 +32240,7 @@ export default function HomePage() {
             </ul>
 
             <a href="/auth" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
-              Claim your spot — It's free
+              {c.founding.cta}
             </a>
           </div>
 
@@ -31809,12 +32248,12 @@ export default function HomePage() {
             <div className="bg-[#1B3A6B] rounded-3xl px-10 py-12 text-center max-w-sm w-full relative overflow-hidden">
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#00B4D8]/20 rounded-full blur-2xl" />
               <div className="text-8xl font-black text-[#00B4D8] leading-none tracking-tight">500</div>
-              <div className="text-white font-bold mt-2">Founding Member Spots</div>
-              <div className="text-white/50 text-sm mb-6">Limited. First come, first served.</div>
+              <div className="text-white font-bold mt-2">{c.founding.spotsTitle}</div>
+              <div className="text-white/50 text-sm mb-6">{c.founding.spotsSub}</div>
               <div className="bg-white/10 rounded-full h-2 overflow-hidden mb-2">
                 <div className="h-full bg-gradient-to-r from-[#00B4D8] to-[#90E0EF] rounded-full w-[23%]" />
               </div>
-              <div className="text-white/50 text-xs text-right">383 spots remaining</div>
+              <div className="text-white/50 text-xs text-right">{c.founding.spotsRemaining}</div>
             </div>
           </div>
         </div>
@@ -31824,17 +32263,13 @@ export default function HomePage() {
       <section className="py-24 px-[5%]" id="business">
         <div className="max-w-[1200px] mx-auto grid md:grid-cols-2 gap-20 items-center">
           <div className="fade-up opacity-0 translate-y-6 transition-all duration-700">
-            <p className="text-[#00B4D8] text-xs font-bold tracking-widest uppercase mb-3">For businesses</p>
-            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight leading-tight mb-4">Give your team a<br />financial edge.</h2>
-            <p className="text-[#4A5568] text-lg leading-relaxed mb-8">Deploy Thankly across your entire staff in minutes. No hardware. No integration. Workers are live same day.</p>
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.business.eyebrow}</p>
+            <h2 className="text-4xl font-black text-[#0D1B2A] tracking-tight leading-tight mb-4">{c.business.h2a}<br />{c.business.h2b}</h2>
+            <p className="text-[#4A5568] text-lg leading-relaxed mb-8">{c.business.sub}</p>
 
             <div className="flex flex-col gap-6">
-              {[
-                { icon: '👥', title: 'Team dashboard', desc: 'See all workers, combined tip volume, and team performance in one view.' },
-                { icon: '📊', title: 'Combined reports', desc: 'Export PDF or Excel reports for your entire team by date range — ready for accounting.' },
-                { icon: '✉️', title: 'Simple worker onboarding', desc: 'Invite workers by email. They\'re set up and receiving tips the same shift.' },
-              ].map((f) => (
-                <div key={f.title} className="flex gap-4 items-start">
+              {c.business.features.map((f, i) => (
+                <div key={i} className="flex gap-4 items-start">
                   <div className="w-11 h-11 rounded-xl bg-[#F0F6FF] flex items-center justify-center text-xl flex-shrink-0">{f.icon}</div>
                   <div>
                     <h3 className="font-bold text-[#0D1B2A] mb-1">{f.title}</h3>
@@ -31843,30 +32278,65 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+
+            <p className="mt-8 text-sm font-semibold text-[#0D1B2A] bg-[#F0F6FF] border border-[#00B4D8]/25 rounded-2xl px-5 py-4">
+              {c.business.pricing}
+            </p>
+
+            <div className="flex flex-wrap gap-4 mt-8">
+              <a
+                href="/auth?role=business"
+                className="inline-flex items-center gap-2 bg-[#1B3A6B] text-white font-extrabold px-8 py-4 rounded-full hover:bg-[#0F2347] hover:-translate-y-0.5 transition-all"
+              >
+                {c.business.cta1}
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+              </a>
+              <a
+                href="mailto:hello@getthankly.com"
+                className="inline-flex items-center gap-2 bg-transparent text-[#1B3A6B] font-bold px-8 py-4 rounded-full border-2 border-[#1B3A6B]/30 hover:border-[#1B3A6B]/70 transition-all"
+              >
+                {c.business.cta2}
+              </a>
+            </div>
           </div>
 
           {/* Report preview */}
           <div className="bg-[#F0F6FF] rounded-2xl p-7 border border-slate-200 fade-up opacity-0 translate-y-6 transition-all duration-700">
             <div className="flex items-center justify-between mb-5">
-              <span className="font-extrabold text-[#0D1B2A]">Team Report — June 2026</span>
-              <span className="bg-[#1B3A6B] text-white text-xs font-bold px-3 py-1 rounded-full">PDF Ready</span>
+              <span className="font-extrabold text-[#0D1B2A]">{c.business.report.title}</span>
+              <span className="bg-[#1B3A6B] text-white text-xs font-bold px-3 py-1 rounded-full">{c.business.report.badge}</span>
             </div>
-            {[
-              { label: 'Total tips collected', value: '$12,847.50' },
-              { label: 'Active workers', value: '23' },
-              { label: 'Total transactions', value: '1,204' },
-              { label: 'Avg tip per transaction', value: '$10.67' },
-              { label: 'Workers paid out', value: '23 / 23', green: true },
-            ].map((row) => (
-              <div key={row.label} className="flex justify-between items-center py-2.5 border-b border-slate-200 last:border-0">
+            {c.business.report.rows.map((row, i) => (
+              <div key={i} className="flex justify-between items-center py-2.5 border-b border-slate-200 last:border-0">
                 <span className="text-sm text-[#4A5568]">{row.label}</span>
-                <span className={`text-sm font-bold ${row.green ? 'text-green-600' : 'text-[#0D1B2A]'}`}>{row.value}</span>
+                <span className={`text-sm font-bold ${'green' in row && row.green ? 'text-green-600' : 'text-[#0D1B2A]'}`}>{row.value}</span>
               </div>
             ))}
             <div className="grid grid-cols-2 gap-2 mt-4">
-              <div className="bg-[#1B3A6B] text-white text-center py-2.5 rounded-xl text-xs font-bold">⬇ Export PDF</div>
-              <div className="border border-[#1B3A6B] text-[#1B3A6B] text-center py-2.5 rounded-xl text-xs font-bold">⬇ Export Excel</div>
+              <div className="bg-[#1B3A6B] text-white text-center py-2.5 rounded-xl text-xs font-bold">{c.business.report.exportPdf}</div>
+              <div className="border border-[#1B3A6B] text-[#1B3A6B] text-center py-2.5 rounded-xl text-xs font-bold">{c.business.report.exportExcel}</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="bg-[#F0F6FF] py-24 px-[5%]" id="faq">
+        <div className="max-w-[860px] mx-auto">
+          <div className="text-center mb-12 fade-up opacity-0 translate-y-6 transition-all duration-700">
+            <p className="text-[#00B4D8] text-sm md:text-base font-bold tracking-widest uppercase mb-3">{c.faq.eyebrow}</p>
+            <h2 className="text-4xl md:text-5xl font-black text-[#0D1B2A] tracking-tight">{c.faq.h2}</h2>
+          </div>
+          <div className="flex flex-col gap-3">
+            {c.faq.items.map((item, i) => (
+              <details key={i} className="group bg-white border border-slate-200 rounded-2xl px-6 py-5 open:border-[#00B4D8] transition-colors fade-up opacity-0 translate-y-6 duration-700">
+                <summary className="flex items-center justify-between cursor-pointer list-none font-bold text-[#0D1B2A] [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <span className="text-[#00B4D8] text-2xl font-light leading-none group-open:rotate-45 transition-transform flex-shrink-0 ml-4">+</span>
+                </summary>
+                <p className="text-sm text-[#4A5568] leading-relaxed mt-3 pr-8">{item.a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>
@@ -31877,14 +32347,14 @@ export default function HomePage() {
           <div className="w-[600px] h-[600px] bg-[#00B4D8]/12 rounded-full blur-3xl" />
         </div>
         <div className="max-w-[860px] mx-auto relative z-10 fade-up opacity-0 translate-y-6 transition-all duration-700">
-          <h2 className="text-5xl font-black text-white tracking-tight leading-tight mb-4">Ready to take control<br />of your tips?</h2>
-          <p className="text-white/70 text-xl mb-10">Join Thankly free. No monthly fees. No hardware. Just your money — organized, tracked, and paid out on your terms.</p>
+          <h2 className="text-5xl font-black text-white tracking-tight leading-tight mb-4">{c.cta.h2a}<br />{c.cta.h2b}</h2>
+          <p className="text-white/70 text-xl mb-10">{c.cta.sub}</p>
           <div className="flex gap-4 justify-center flex-wrap">
             <a href="/auth" className="inline-flex items-center gap-2 bg-[#00B4D8] text-[#0F2347] font-extrabold px-8 py-4 rounded-full hover:bg-[#90E0EF] hover:-translate-y-0.5 transition-all">
-              Get started free
+              {c.cta.cta1}
             </a>
             <a href="/auth/signin" className="inline-flex items-center gap-2 bg-transparent text-white font-bold px-8 py-4 rounded-full border-2 border-white/30 hover:border-white/70 transition-all">
-              Sign in
+              {c.cta.cta2}
             </a>
           </div>
         </div>
@@ -31900,42 +32370,16 @@ export default function HomePage() {
                 Thankly
               </Link>
               <p className="text-white/50 text-sm leading-relaxed max-w-[280px]">
-                The bilingual financial platform for tipped hospitality workers. Your tips. Your records. Your money under your control.
+                {c.footer.tagline}
               </p>
             </div>
 
-            {[
-              {
-                title: 'Product',
-                links: [
-                  { href: '#how-it-works', label: 'How it works' },
-                  { href: '#features', label: 'Features' },
-                  { href: '#founding', label: 'Founding 500' },
-                  { href: '#business', label: 'For Business' },
-                ],
-              },
-              {
-                title: 'Support',
-                links: [
-                  { href: 'mailto:hello@getthankly.com', label: 'Contact us' },
-                  { href: 'mailto:hello@getthankly.com', label: 'legal@getthankly.com' },
-                  { href: 'mailto:legal@getthankly.com', label: 'support@getthankly.com' },
-                ],
-              },
-              {
-                title: 'Legal',
-                links: [
-                   { href: '/privacy', label: 'Privacy Policy' },
-                   { href: '/terms', label: 'Terms of Service' },
-                   { href: '/disclosures', label: 'Disclosures' },
-                ],
-              },
-            ].map((col) => (
-              <div key={col.title}>
+            {c.footer.columns.map((col, i) => (
+              <div key={i}>
                 <p className="text-white/40 text-xs font-bold tracking-widest uppercase mb-4">{col.title}</p>
                 <ul className="flex flex-col gap-2.5">
-                  {col.links.map((link) => (
-                    <li key={link.label}>
+                  {col.links.map((link, j) => (
+                    <li key={j}>
                       <Link href={link.href} className="text-white/60 text-sm hover:text-white transition-colors">
                         {link.label}
                       </Link>
@@ -31947,14 +32391,10 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <p className="text-white/40 text-xs">© 2026 Thankly LLC. All rights reserved. Orlando, Florida.</p>
+            <p className="text-white/40 text-xs">{c.footer.copyright}</p>
             <div className="flex gap-5 flex-wrap">
-              {[
-                { href: '/privacy', label: 'Privacy' },
-                { href: '/terms', label: 'Terms' },
-                { href: '/disclosures', label: 'Disclosures' },
-              ].map((link) => (
-                <Link key={link.href} href={link.href} className="text-white/40 text-xs hover:text-white/80 transition-colors">
+              {c.footer.legalLinks.map((link, i) => (
+                <Link key={i} href={link.href} className="text-white/40 text-xs hover:text-white/80 transition-colors">
                   {link.label}
                 </Link>
               ))}
