@@ -50,8 +50,10 @@ export async function GET() {
     const { worker, errorResponse } = await getAuthedWorker();
     if (!worker) return errorResponse;
 
-    if (!worker.stripe_account_id) {
-      return NextResponse.json({ error: "Stripe account not found." }, { status: 404 });
+    // Not onboarded (or reset): no account to query — return an empty,
+    // non-error balance so the card renders its normal "not ready" state.
+    if (!worker.stripe_account_id || !worker.stripe_onboarded) {
+      return NextResponse.json({ available: [], pending: [], accountReady: false });
     }
 
     if (IS_SANDBOX) {
@@ -67,7 +69,21 @@ export async function GET() {
       available: balance.available,
       pending: balance.pending,
     });
-  } catch (error) {
+  } catch (error: any) {
+    // A Stripe account that's invalid, restricted, or inaccessible is an
+    // account-state issue, not a server failure. Return calmly (no 500, no log
+    // spam) so the UI can prompt the worker to fix their payout account.
+    if (
+      error?.type === "StripePermissionError" ||
+      error?.code === "account_invalid" ||
+      error?.statusCode === 403
+    ) {
+      return NextResponse.json(
+        { available: [], pending: [], accountReady: false, needsAttention: true },
+        { status: 200 }
+      );
+    }
+
     console.error("Web balance fetch error:", error);
     return NextResponse.json({ error: "Unable to fetch Stripe balance." }, { status: 500 });
   }
