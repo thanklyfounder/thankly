@@ -1,29 +1,92 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import AppNav from "@/components/AppNav";
+import { supabase } from "@/lib/supabase";
+
+type Status = "confirming" | "ready" | "signin_required";
 
 function ConfirmContent() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
+  const code = searchParams.get("code");
+  const [status, setStatus] = useState<Status>("confirming");
   const [continuing, setContinuing] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function establishSession() {
+      // Already signed in (e.g. revisiting this page)?
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        if (!cancelled) setStatus("ready");
+        return;
+      }
+
+      if (!code) {
+        if (!cancelled) setStatus("signin_required");
+        return;
+      }
+
+      // Exchange the email-confirmation code for a session (PKCE).
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (cancelled) return;
+
+      if (error) {
+        // The client's auto-detection may have already consumed the code —
+        // check again before concluding we have no session.
+        const { data: { session: retry } } = await supabase.auth.getSession();
+        setStatus(retry ? "ready" : "signin_required");
+      } else {
+        setStatus("ready");
+      }
+    }
+
+    establishSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
 
   async function handleContinueWeb() {
     if (next === "business") {
       window.location.href = "/business/create";
       return;
     }
+
+    if (status === "signin_required") {
+      // No session could be established here (e.g. the link was opened in a
+      // different browser or incognito). Sign-in provisions the worker row.
+      sessionStorage.setItem("authView", "signin");
+      window.location.href = "/auth";
+      return;
+    }
+
     try {
       setContinuing(true);
       // Provision the worker row now (Stripe deferred), then go to the dashboard.
       await fetch("/api/ensure-worker", { method: "POST" });
       window.location.href = "/manage";
     } catch {
-      // If provisioning hiccups, fall back to the normal signed-in path.
       window.location.href = "/auth";
     }
   }
+
+  const buttonLabel =
+    status === "confirming"
+      ? "Confirming…"
+      : status === "signin_required"
+      ? "Sign in to continue →"
+      : continuing
+      ? "Setting up…"
+      : "Continue on web →";
+
+  const bodyText =
+    status === "signin_required"
+      ? "Your email is confirmed. Sign in to finish setting up your account."
+      : "Your Thankly account is now active. Choose how you'd like to continue.";
 
   return (
     <>
@@ -50,10 +113,10 @@ function ConfirmContent() {
           Email confirmed!
         </h1>
         <p style={{ color: "#475569", fontSize: "15px", lineHeight: "1.6", margin: "0 0 24px" }}>
-          Your Thankly account is now active. Choose how you'd like to continue.
+          {bodyText}
         </p>
-        <button onClick={handleContinueWeb} disabled={continuing} style={{ display: "inline-block" as const, backgroundColor: "#0f3f73", color: "#ffffff", padding: "14px 32px", borderRadius: "12px", border: "none", cursor: continuing ? "default" : "pointer", fontWeight: "700", fontSize: "15px", width: "100%", boxSizing: "border-box" as const, marginBottom: "12px", opacity: continuing ? 0.7 : 1 }}>
-          {continuing ? "Setting up…" : "Continue on web →"}
+        <button onClick={handleContinueWeb} disabled={continuing || status === "confirming"} style={{ display: "inline-block" as const, backgroundColor: "#0f3f73", color: "#ffffff", padding: "14px 32px", borderRadius: "12px", border: "none", cursor: continuing || status === "confirming" ? "default" : "pointer", fontWeight: "700", fontSize: "15px", width: "100%", boxSizing: "border-box" as const, marginBottom: "12px", opacity: continuing || status === "confirming" ? 0.7 : 1 }}>
+          {buttonLabel}
         </button>
         <a href="thanklymobile://auth" style={{ display: "inline-block" as const, backgroundColor: "#f1f5f9", color: "#0f3f73", padding: "14px 32px", borderRadius: "12px", textDecoration: "none", fontWeight: "700", fontSize: "15px", width: "100%", boxSizing: "border-box" as const }}>
           Open Thankly App
