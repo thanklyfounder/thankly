@@ -135,6 +135,16 @@ export default function SmsConsentPage() {
 
         {/* Compliance summary */}
         <div className="mt-16 rounded-3xl bg-[#0F2347] p-8 text-white">
+          <div className="bg-white/10 rounded-2xl px-6 py-6 mb-8">
+            <h2 className="text-xl font-black mb-4">Mobile Information Privacy</h2>
+            <p className="text-white/80 text-sm leading-relaxed mb-3">
+              <strong className="text-white">No mobile information will be shared with third parties or affiliates for marketing or promotional purposes.</strong> All other categories of data sharing described in our Privacy Policy exclude text-messaging originator opt-in data and consent; this information will not be shared with any third parties.
+            </p>
+            <p className="text-white/80 text-sm leading-relaxed">
+              We may share your mobile number only with trusted service providers (such as Twilio, our SMS delivery provider) who assist us in operating the verification messaging program, and only to deliver those messages on our behalf. We do not use your phone number for marketing or promotional purposes. Message and data rates may apply. Reply STOP to opt out, HELP for help.
+            </p>
+          </div>
+
           <h2 className="text-xl font-black mb-6">Compliance Summary</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
@@ -158,7 +168,7 @@ export default function SmsConsentPage() {
         </div>
 
         <p className="mt-8 text-xs text-slate-400 text-center">
-          Questions? Contact <a href="mailto:admin@getthankly.com" className="text-[#0F4C81] hover:underline">admin@getthankly.com</a>
+          Questions? Contact <a href="mailto:hello@getthankly.com" className="text-[#0F4C81] hover:underline">hello@getthankly.com</a>
         </p>
 
       </div>

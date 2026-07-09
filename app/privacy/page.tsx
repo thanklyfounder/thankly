@@ -90,8 +90,10 @@ export default function PrivacyPage() {
         </ul>
 
         <h3>SMS communications and security</h3>
-        <p>Thankly utilizes SMS messaging exclusively for account authentication and security-related notifications, such as one-time passwords (OTP). We do not use your phone number for marketing or promotional purposes, and we do not share your number with third parties for their own marketing use. By providing your phone number, you opt in to receive these security-related messages. Message and data rates may apply depending on your mobile carrier plan. You may opt out or request assistance by contacting <a href="mailto:hello@getthankly.com">hello@getthankly.com</a>.</p>
-        <p>SMS messages are sent from our registered number +1 (407) 759-7255 via Twilio, our A2P 10DLC registered SMS provider. Our SMS campaign is registered under the &#x201C;Two-Factor Authentication&#x201D; use case, covering all OTP and verification messages sent during account signup and authentication.</p>
+        <p>Thankly utilizes SMS messaging exclusively for account authentication and security-related notifications, such as one-time passwords (OTP). We collect your mobile number when you provide it during registration and consent to receive these messages. We do not use your phone number for marketing or promotional purposes.</p>
+        <p><strong>No mobile information will be shared with third parties or affiliates for marketing or promotional purposes.</strong> All other categories of data sharing described in this policy exclude text-messaging originator opt-in data and consent; this information will not be shared with any third parties. We may share your mobile number only with trusted service providers (such as Twilio, our SMS delivery provider) who assist us in operating the verification messaging program, and only to deliver those messages on our behalf.</p>
+        <p>Message frequency: messages are sent only during account signup and authentication. Message and data rates may apply depending on your mobile carrier plan. Reply STOP to opt out, HELP for help, or contact <a href="mailto:hello@getthankly.com">hello@getthankly.com</a> for assistance.</p>
+        <p>SMS messages are sent from our registered number +1 (407) 759-7255 via Twilio, our A2P 10DLC registered SMS provider, under the &#x201C;Two-Factor Authentication&#x201D; use case, covering all OTP and verification messages sent during account signup and authentication.</p>
       </section>
 
       <section id="share">
