@@ -26,7 +26,7 @@ export default function JoinBusinessPage() {
   useEffect(() => {
     async function loadBusiness() {
       const { data } = await supabase
-        .from("businesses")
+        .from("public_business_profiles")
         .select("id, name, slug")
         .eq("slug", slug)
         .single();
