@@ -63,7 +63,7 @@ export default function TermsPage() {
         <p>You receive a unique QR code linked to your public profile. You control your display name and photo and are responsible for profile accuracy.</p>
 
         <h3>SMS verification</h3>
-        <p>Account registration and login require phone number verification via SMS one-time password (OTP). By providing your phone number, you consent to receive security-related SMS messages from Thankly. Messages are sent exclusively for authentication purposes from our registered number +1 (407) 759-7255. We do not use your phone number for marketing. Message and data rates may apply.</p>
+        <p>Account registration and login require phone number verification via SMS one-time password (OTP). By providing your phone number, you consent to receive security-related SMS messages from Thankly. Messages are sent exclusively for authentication purposes from our registered number +1 (407) 759-7255. We do not use your phone number for marketing. <strong>No mobile information will be shared with third parties or affiliates for marketing or promotional purposes.</strong> Message and data rates may apply.</p>
 
         <h3>Platform fee</h3>
         <p>A fee is charged per transaction as displayed at time of payment. Current rates at getthankly.com/fees. Rate changes are communicated 30 days in advance.</p>
