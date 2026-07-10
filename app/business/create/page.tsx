@@ -233,7 +233,38 @@ export default function CreateBusinessPage() {
         )}
 
         {/* Step 2 — Account creation (only if not authenticated) */}
-        {step === "account" && (
+        {step === "account" && isAuthenticated && (
+          <div className="p-6">
+            <button
+              type="button"
+              onClick={() => { setStep("name"); setErrorMessage(""); }}
+              className="mb-4 text-sm text-slate-400 hover:text-slate-600"
+            >
+              ← {businessName}
+            </button>
+
+            <p className="text-sm text-slate-600 mb-4">
+              {language === "en"
+                ? `You're signed in. Create your business "${businessName}" to finish setting up.`
+                : `Ya iniciaste sesión. Crea tu negocio "${businessName}" para terminar.`}
+            </p>
+
+            {errorMessage ? (
+              <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => createBusiness()}
+              disabled={loading}
+              className="mt-2 w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+            >
+              {loading ? t.loading : t.createBusiness}
+            </button>
+          </div>
+        )}
+
+        {step === "account" && !isAuthenticated && (
           <div className="p-6">
             <button
               type="button"
