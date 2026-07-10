@@ -14,12 +14,53 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Supabase puts the session in the URL hash — this processes it
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setReady(true);
+    let cancelled = false;
+
+    async function verifyResetLink() {
+      // If a session already exists (e.g. PASSWORD_RECOVERY already fired), proceed.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        if (!cancelled) setReady(true);
+        return;
       }
+
+      // PKCE flow: exchange the ?code= in the URL for a recovery session.
+      const code = new URLSearchParams(window.location.search).get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!cancelled) {
+          if (error) {
+            // Re-check in case the client auto-consumed the code.
+            const { data: { session: retry } } = await supabase.auth.getSession();
+            if (retry) {
+              setReady(true);
+            } else {
+              setMessage("This reset link is invalid or has expired. Please request a new one.");
+            }
+          } else {
+            setReady(true);
+          }
+        }
+        return;
+      }
+
+      // No session and no code — nothing to verify.
+      if (!cancelled) {
+        setMessage("This reset link is invalid or has expired. Please request a new one.");
+      }
+    }
+
+    // Keep listening too, in case the event fires independently.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY" && !cancelled) setReady(true);
     });
+
+    verifyResetLink();
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   async function handleReset() {
@@ -50,7 +91,7 @@ export default function ResetPasswordPage() {
       <main className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
         <div className="w-full max-w-sm rounded-3xl bg-white shadow-xl p-8 text-center">
           <div className="w-16 h-16 rounded-2xl mx-auto mb-4" style={{background: "linear-gradient(135deg, #1b5a96, #0f3f73)"}} />
-          <p className="text-slate-700 text-sm">Verifying your reset link...</p>
+          <p className="text-slate-700 text-sm">{message || "Verifying your reset link..."}</p>
         </div>
       </main>
     );
