@@ -118,6 +118,22 @@ function AuthContent() {
         return;
       }
 
+      // Business owners are identified by business_name in signup metadata.
+      const isBusinessOwner = !!data.user.user_metadata?.business_name;
+
+      if (isBusinessOwner) {
+        const { data: business } = await supabase
+          .from("businesses")
+          .select("slug")
+          .eq("owner_auth_user_id", data.user.id)
+          .maybeSingle();
+
+        // Has a business → their dashboard. Orphaned (confirmed but never
+        // finished creating) → /business/create, which pre-fills their name.
+        router.push(business?.slug ? `/business/${business.slug}` : "/business/create");
+        return;
+      }
+
       const { data: worker } = await supabase
         .from("workers")
         .select("profile_slug")

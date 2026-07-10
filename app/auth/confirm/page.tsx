@@ -51,22 +51,26 @@ function ConfirmContent() {
   }, [code]);
 
   async function handleContinueWeb() {
-    if (next === "business") {
-      window.location.href = "/business/create";
-      return;
-    }
-
+    // If no session could be established here (link opened in a different
+    // browser/incognito, or the code exchange failed), route to sign-in, which
+    // provisions the correct entity on login. Applies to BOTH worker & business.
     if (status === "signin_required") {
-      // No session could be established here (e.g. the link was opened in a
-      // different browser or incognito). Sign-in provisions the worker row.
       sessionStorage.setItem("authView", "signin");
       window.location.href = "/auth";
       return;
     }
 
+    // Business owners: the session now exists (exchange completed on load).
+    // Send them to /business/create, which reads business_name from metadata,
+    // pre-fills it, and creates the businesses row on submit.
+    if (next === "business") {
+      window.location.href = "/business/create";
+      return;
+    }
+
+    // Workers: provision the row now (Stripe deferred), then go to the dashboard.
     try {
       setContinuing(true);
-      // Provision the worker row now (Stripe deferred), then go to the dashboard.
       await fetch("/api/ensure-worker", { method: "POST" });
       window.location.href = "/manage";
     } catch {

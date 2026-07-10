@@ -22,6 +22,28 @@ export default function CreateBusinessPage() {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
       setIsAuthenticated(!!user);
+
+      if (user) {
+        // Already has a business? Send them to it — no duplicate businesses.
+        const { data: existing } = await supabase
+          .from("businesses")
+          .select("slug")
+          .eq("owner_auth_user_id", user.id)
+          .maybeSingle();
+
+        if (existing?.slug) {
+          window.location.href = `/business/${existing.slug}`;
+          return;
+        }
+
+        // Orphaned business owner: pre-fill the intended name from signup metadata
+        // and skip straight to the create step (account already exists).
+        const metaName = user.user_metadata?.business_name as string | undefined;
+        if (metaName) {
+          setBusinessName(metaName);
+        }
+      }
+
       setAuthChecking(false);
     }
     checkAuth();
