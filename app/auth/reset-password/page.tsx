@@ -74,6 +74,17 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
+
+    // Verify we actually hold a recovery session before attempting the update.
+    // Without this, a failed PKCE exchange lets updateUser no-op while still
+    // reporting success — the password silently doesn't change.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setLoading(false);
+      setMessage("Your reset session has expired or is invalid. Please request a new reset link and open it in the same browser.");
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
 
