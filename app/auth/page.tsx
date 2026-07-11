@@ -257,8 +257,8 @@ function AuthContent() {
           {/* ── WORKER SIGNUP ── */}
           {view === "worker_signup" && (
             <>
-              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
-                ← Back
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition">
+                ← All options
               </button>
               <h2 className="text-lg font-bold text-slate-900 mb-1">Worker Account</h2>
               <p className="text-sm text-slate-500 mb-5">For individuals who receive tips.</p>
@@ -290,8 +290,8 @@ function AuthContent() {
           {/* ── BUSINESS SIGNUP ── */}
           {view === "business_signup" && (
             <>
-              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
-                ← Back
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition">
+                ← All options
               </button>
               <h2 className="text-lg font-bold text-slate-900 mb-1">Business Account</h2>
               <p className="text-sm text-slate-500 mb-5">For managers and business owners.</p>
@@ -322,8 +322,8 @@ function AuthContent() {
           {/* ── SIGN IN ── */}
           {view === "signin" && (
             <>
-              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-[#0f3f73] bg-[#f0f5ff] px-3 py-1.5 text-sm font-semibold text-[#0f3f73] hover:bg-[#0f3f73] hover:text-white transition">
-                ← Back
+              <button onClick={() => { setError(""); setView("select"); }} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-600 transition">
+                ← All options
               </button>
               <h2 className="text-lg font-bold text-slate-900 mb-1">Welcome back</h2>
               <p className="text-sm text-slate-500 mb-5">Sign in to your Thankly account.</p>
