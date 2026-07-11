@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
+import PasswordInput from "@/components/PasswordInput";
 
 type View = "select" | "worker_signup" | "business_signup" | "signin" | "check_email";
 
@@ -266,7 +267,7 @@ function AuthContent() {
               <div className="space-y-3">
                 <input type="text" placeholder="Full name" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClass} />
                 <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
-                <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
+                <PasswordInput placeholder="Password" value={password} onChange={setPassword} className={inputClass} />
                 <input type="tel" placeholder="Phone number (e.g. 4075551234)" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} />
                 <p className="text-xs text-slate-400 text-center">By continuing, you consent to receive a verification SMS. Standard message and data rates may apply.</p>
               </div>
@@ -300,7 +301,7 @@ function AuthContent() {
                 <input type="text" placeholder="Business name" value={businessName} onChange={e => setBusinessName(e.target.value)} className={inputClass} />
                 <input type="text" placeholder="Your name" value={ownerName} onChange={e => setOwnerName(e.target.value)} className={inputClass} />
                 <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
-                <input type="password" placeholder="Password (min 8 characters)" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
+                <PasswordInput placeholder="Password" value={password} onChange={setPassword} className={inputClass} />
               </div>
 
               {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
@@ -330,7 +331,7 @@ function AuthContent() {
 
               <div className="space-y-3">
                 <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
-                <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
+                <PasswordInput placeholder="Password" value={password} onChange={setPassword} className={inputClass} />
               </div>
 
               {!showForgot && (
