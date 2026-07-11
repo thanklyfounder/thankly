@@ -12,6 +12,8 @@ import { Suspense } from "react";
 function AuthContent() {
   const router = useRouter();
   const [view, setView] = useState<View>("select");
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   useEffect(() => {
     const intent = sessionStorage.getItem("authView");
@@ -100,6 +102,25 @@ function AuthContent() {
     }
 
     setView("check_email");
+  }
+
+  async function handleForgotPassword() {
+    setError("");
+    if (!email.trim()) {
+      setError("Enter your email address first.");
+      return;
+    }
+    setLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      { redirectTo: "https://getthankly.com/auth/reset-password" }
+    );
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setForgotSent(true);
   }
 
   async function handleSignIn() {
@@ -312,9 +333,55 @@ function AuthContent() {
                 <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
               </div>
 
-              <div className="mt-2 text-right">
-                <a href="/auth/reset-password" className="text-xs text-[#0f3f73] hover:underline">Forgot password?</a>
-              </div>
+              {!showForgot && (
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => { setError(""); setForgotSent(false); setShowForgot(true); }}
+                    className="text-xs text-[#0f3f73] hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
+              {showForgot && !forgotSent && (
+                <div className="mt-3 rounded-2xl bg-[#f0f5ff] border border-[#0f3f73]/20 p-4">
+                  <p className="text-sm text-slate-700 mb-2">Enter your email and we'll send you a reset link.</p>
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className={inputClass}
+                  />
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={loading}
+                      className="flex-1 rounded-2xl bg-[#0F4C81] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      {loading ? "Sending..." : "Send reset link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setError(""); setShowForgot(false); }}
+                      className="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {showForgot && forgotSent && (
+                <div className="mt-3 rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
+                  <p className="text-sm text-emerald-800">
+                    Check your inbox — we've sent a password reset link to <strong>{email}</strong>. Open it in this same browser to reset your password.
+                  </p>
+                </div>
+              )}
 
               {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
 
