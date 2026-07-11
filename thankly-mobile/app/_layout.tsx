@@ -9,6 +9,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import AnimatedSplash from "@/components/AnimatedSplash";
+import BiometricLock from "@/components/BiometricLock";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -39,11 +40,13 @@ export default function RootLayout() {
     <LanguageProvider>
       <AuthProvider>
         <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
-          </Stack>
+          <BiometricLock>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="auth" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
+            </Stack>
+          </BiometricLock>
 
           <StatusBar style="auto" />
         </ThemeProvider>

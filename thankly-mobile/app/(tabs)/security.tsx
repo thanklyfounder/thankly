@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
+import * as SecureStore from "expo-secure-store";
 
 import SectionHeader from "@/components/SectionHeader";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,12 +32,16 @@ export default function SecurityScreen() {
   async function checkBiometrics() {
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const enrolled = await LocalAuthentication.isEnrolledAsync();
-
     setBiometricsAvailable(hasHardware && enrolled);
+
+    // Load the saved preference so the toggle reflects reality on mount.
+    const saved = await SecureStore.getItemAsync("thankly_biometric_lock");
+    setBiometricsEnabled(saved === "true");
   }
 
   async function toggleBiometrics(value: boolean) {
     if (!value) {
+      await SecureStore.setItemAsync("thankly_biometric_lock", "false");
       setBiometricsEnabled(false);
       return;
     }
@@ -51,6 +56,7 @@ export default function SecurityScreen() {
       return;
     }
 
+    await SecureStore.setItemAsync("thankly_biometric_lock", "true");
     setBiometricsEnabled(true);
 
     Alert.alert(

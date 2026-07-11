@@ -79,7 +79,7 @@ export default function LinkWorkplaceScreen() {
     setMessage(null);
 
     const { data: business } = await supabase
-      .from("businesses")
+      .from("public_business_profiles")
       .select("id, name")
       .eq("slug", slug)
       .single();
