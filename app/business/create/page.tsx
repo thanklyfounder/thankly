@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
+import PasswordInput from "@/components/PasswordInput";
 
 type Language = "en" | "es";
 type Step = "name" | "account";
@@ -282,10 +283,9 @@ export default function CreateBusinessPage() {
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
 
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder={t.passwordPlaceholder}
               className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
             />

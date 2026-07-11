@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import AppNav from "@/components/AppNav";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -121,18 +122,16 @@ export default function ResetPasswordPage() {
           <h2 className="text-xl font-bold text-slate-900 mb-1">Set new password</h2>
           <p className="text-slate-700 text-sm mb-6">Choose a strong password for your Thankly account.</p>
 
-          <input
-            type="password"
+          <PasswordInput
             placeholder="New password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 mb-3"
           />
-          <input
-            type="password"
+          <PasswordInput
             placeholder="Confirm new password"
             value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
+            onChange={setConfirm}
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 mb-4"
           />
 
