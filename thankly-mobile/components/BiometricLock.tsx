@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const LOCK_GRACE_MS = 30_000;
 
 export default function BiometricLock({ children }: { children: React.ReactNode }) {
-  const { session, signOut } = useAuth();
+  const { session, loading, signOut } = useAuth();
   const [locked, setLocked] = useState(false);
   const [checking, setChecking] = useState(true);
   const backgroundedAt = useRef<number | null>(null);
@@ -34,8 +34,12 @@ export default function BiometricLock({ children }: { children: React.ReactNode 
     if (result.success) setLocked(false);
   }
 
-  // Initial mount: decide whether to lock.
+  // Decide whether to lock — but only after auth has finished restoring the
+  // session on cold start. Checking before `loading` clears would see a null
+  // session and wrongly conclude "no lock", skipping Face ID on launch.
   useEffect(() => {
+    if (loading) return; // wait for session restore to complete
+
     let cancelled = false;
     (async () => {
       const lock = await shouldLock();
@@ -46,7 +50,7 @@ export default function BiometricLock({ children }: { children: React.ReactNode 
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, loading]);
 
   // Background/foreground handling with grace timeout.
   useEffect(() => {
@@ -69,7 +73,7 @@ export default function BiometricLock({ children }: { children: React.ReactNode 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  if (checking) return null; // brief; splash already showed
+  if (loading || checking) return null; // wait for auth restore; splash already showed
 
   if (locked) {
     return (
