@@ -64,25 +64,29 @@ export default function BankAccountScreen() {
     try {
       setConnectingStripe(true);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/mobile/create-account-link`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            authUserId: user.id,
-            email: user.email,
-            fullName: user.email.split("@")[0],
-          }),
-        }
-      );
+      // Onboarded accounts open the Stripe Express dashboard to MANAGE their
+      // account (login link). Only non-onboarded accounts get the onboarding
+      // link — otherwise an already-connected account loops on "confirm".
+      const endpoint = worker?.stripe_onboarded
+        ? `${API_BASE_URL}/api/mobile/stripe-login-link`
+        : `${API_BASE_URL}/api/mobile/create-account-link`;
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          authUserId: user.id,
+          email: user.email,
+          fullName: user.email.split("@")[0],
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok || !data.url) {
-        console.error("Stripe onboarding error:", data);
+        console.error("Stripe link error:", data);
         return;
       }
 
