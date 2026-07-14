@@ -269,7 +269,14 @@ function AuthContent() {
                 <input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
                 <PasswordInput placeholder="Password" value={password} onChange={setPassword} className={inputClass} />
                 <input type="tel" placeholder="Phone number (e.g. 4075551234)" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} />
-                <p className="text-xs text-slate-400 text-center">By continuing, you consent to receive a verification SMS. Standard message and data rates may apply.</p>
+                <p className="text-xs text-slate-400 text-center">
+                  By continuing, you consent to receive a verification SMS (one-time passcode) from Thankly. Message frequency varies. Message and data rates may apply. Reply STOP to opt out, HELP for help. Mobile information will not be shared with third parties or affiliates for marketing or promotional purposes.
+                </p>
+                <p className="text-xs text-slate-400 text-center mt-2">
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>
+                  {" · "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms &amp; Conditions</a>
+                </p>
               </div>
 
               {error && <p className="mt-3 text-sm text-red-600 text-center">{error}</p>}
@@ -424,9 +431,14 @@ function AuthContent() {
                 Google Play
               </a>
             </div>
+            <p className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-400">
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>
+              {" · "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms &amp; Conditions</a>
+            </p>
           </div>
         </div>
-      </div>    
+      </div>  
     </main>
     </>
   );
