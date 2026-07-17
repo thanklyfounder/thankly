@@ -34,6 +34,7 @@ type Worker = {
   stripe_onboarded?: boolean | null;
   stripe_account_id?: string | null;
   avatar_url?: string | null;
+  payout_preference?: string | null;
 };
 
 type Transaction = {
@@ -266,6 +267,17 @@ export default function PayoutsScreen() {
           <Text style={styles.pendingBalance}>
             {t.payouts.pending}: {formatDollars(pendingBalance)}
           </Text>
+          {worker?.payout_preference ? (
+            <View style={styles.scheduleNote}>
+              <Text style={styles.scheduleNoteText}>
+                {worker.payout_preference === "manual"
+                  ? t.payouts.scheduleManual
+                  : worker.payout_preference === "weekly"
+                    ? t.payouts.scheduleWeekly
+                    : t.payouts.scheduleDaily}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Payout Method Selection — now functional */}
@@ -450,6 +462,18 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: "#94a3b8",
     fontSize: 13,
+  },
+  scheduleNote: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.15)",
+  },
+  scheduleNoteText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
+    textAlign: "center",
+    lineHeight: 17,
   },
   pendingBalance: {
     marginTop: 8,

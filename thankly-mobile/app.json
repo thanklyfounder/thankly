@@ -67,6 +67,12 @@
           "cameraPermission": "Thankly uses your camera to scan business invite QR codes."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icons/app-notifications.png"
+        }
+      ],
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       "expo-asset",

@@ -23,6 +23,7 @@ type Worker = {
   full_name?: string | null;
   stripe_onboarded?: boolean | null;
   stripe_account_id?: string | null;
+  payout_preference?: string | null;
 };
 
 export default function BankAccountScreen() {
@@ -31,6 +32,8 @@ export default function BankAccountScreen() {
   const [worker, setWorker] = useState<Worker | null>(null);
   const [loading, setLoading] = useState(true);
   const [connectingStripe, setConnectingStripe] = useState(false);
+  const [payoutPref, setPayoutPref] = useState<string>("daily");
+  const [payoutSaving, setPayoutSaving] = useState<string | null>(null);
 
   const isStripeConnected =
     Boolean(worker?.stripe_account_id) && Boolean(worker?.stripe_onboarded);
@@ -48,10 +51,31 @@ export default function BankAccountScreen() {
       setLoading(true);
       const currentWorker = await getCurrentWorker(user.id);
       setWorker(currentWorker);
+      setPayoutPref(currentWorker?.payout_preference ?? "daily");
     } catch (error) {
       console.error("Bank account load error:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function choosePayout(pref: string) {
+    if (!user?.id || pref === payoutPref || payoutSaving) return;
+    try {
+      setPayoutSaving(pref);
+      const res = await fetch(`${API_BASE_URL}/api/mobile/update-payout-schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authUserId: user.id, preference: pref, weeklyAnchor: "friday" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPayoutPref(pref);
+      }
+    } catch (e) {
+      console.error("Payout schedule update error:", e);
+    } finally {
+      setPayoutSaving(null);
     }
   }
 
@@ -158,12 +182,64 @@ export default function BankAccountScreen() {
             {t.managebank.stripeDisclaimer}
           </Text>
         </View>
+
+        {isStripeConnected && (
+          <View style={styles.card}>
+            <Text style={styles.title}>{t.managebank.payoutScheduleTitle}</Text>
+            <Text style={styles.text}>
+              {t.managebank.payoutScheduleSub}
+            </Text>
+
+            {[
+              { key: "daily", title: t.managebank.payoutDailyTitle, desc: t.managebank.payoutDailyDesc },
+              { key: "weekly", title: t.managebank.payoutWeeklyTitle, desc: t.managebank.payoutWeeklyDesc },
+              { key: "manual", title: t.managebank.payoutManualTitle, desc: t.managebank.payoutManualDesc },
+            ].map((opt) => {
+              const active = payoutPref === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.payoutCard, active && styles.payoutCardActive]}
+                  onPress={() => choosePayout(opt.key)}
+                  disabled={!!payoutSaving}
+                >
+                  <View style={styles.payoutHeader}>
+                    <Text style={[styles.payoutTitle, active && styles.payoutTitleActive]}>{opt.title}</Text>
+                    {active ? (
+                      <Text style={styles.payoutBadge}>{t.managebank.payoutCurrent}</Text>
+                    ) : payoutSaving === opt.key ? (
+                      <ActivityIndicator size="small" color="#0f3f73" />
+                    ) : null}
+                  </View>
+                  <Text style={styles.payoutDesc}>{opt.desc}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  payoutCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 10,
+    borderWidth: 2,
+    borderColor: "#e2e8f0",
+  },
+  payoutCardActive: { borderColor: "#00B4D8", backgroundColor: "#f0f9ff" },
+  payoutHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  payoutTitle: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
+  payoutTitleActive: { color: "#0f3f73" },
+  payoutDesc: { fontSize: 13, color: "#64748b", lineHeight: 18 },
+  payoutBadge: {
+    backgroundColor: "#00B4D8", color: "#fff", fontSize: 11, fontWeight: "700",
+    paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, overflow: "hidden",
+  },
   loadingContainer: {
     flex: 1,
     backgroundColor: "#f1f5f9",
