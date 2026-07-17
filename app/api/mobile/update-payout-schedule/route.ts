@@ -5,7 +5,11 @@ import { createAdminClient } from "@/lib/supabase-admin";
 const VALID = ["daily", "weekly", "manual"] as const;
 type Pref = (typeof VALID)[number];
 
-function buildSchedule(pref: Pref, weeklyAnchor: string) {
+type WeeklyAnchor =
+  | "monday" | "tuesday" | "wednesday" | "thursday"
+  | "friday" | "saturday" | "sunday";
+
+function buildSchedule(pref: Pref, weeklyAnchor: WeeklyAnchor) {
   switch (pref) {
     case "daily":
       return { interval: "daily" as const };
@@ -23,7 +27,7 @@ export async function POST(req: NextRequest) {
     if (!authUserId || !VALID.includes(preference)) {
       return NextResponse.json({ error: "Invalid request." }, { status: 400 });
     }
-    const anchor = weeklyAnchor || "friday";
+    const anchor: WeeklyAnchor = (weeklyAnchor || "friday") as WeeklyAnchor;
 
     const supabase = createAdminClient();
     const { data: worker, error } = await supabase
