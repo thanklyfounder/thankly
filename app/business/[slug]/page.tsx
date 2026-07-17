@@ -316,6 +316,7 @@ export default async function BusinessDashboardPage({ params, searchParams }: Pa
               businessName={business.name}
               workers={workers ?? []}
               transactions={transactions ?? []}
+              rangeLabel={RANGE_OPTIONS.find((o) => o.key === range)?.label}
             />
           </div>
         </section>

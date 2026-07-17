@@ -30,6 +30,7 @@ type Props = {
   businessName: string;
   workers: Worker[];
   transactions: Transaction[];
+  rangeLabel?: string;
 };
 
 function money(cents: number | null | undefined) {
@@ -58,6 +59,7 @@ export default function BusinessExportButton({
   businessName,
   workers,
   transactions,
+  rangeLabel,
 }: Props) {
   const workerById = new Map(workers.map((w) => [w.id, w]));
 
@@ -334,7 +336,7 @@ export default function BusinessExportButton({
         onClick={handleExcelExport}
         className="rounded-2xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition"
       >
-        Export Team Excel
+        Export Team Excel{rangeLabel ? ` · ${rangeLabel}` : ""}
       </button>
 
       <button
@@ -342,7 +344,7 @@ export default function BusinessExportButton({
         onClick={handlePdfExport}
         className="rounded-2xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 transition"
       >
-        Export Team PDF
+        Export Team PDF{rangeLabel ? ` · ${rangeLabel}` : ""}
       </button>
     </div>
   );
