@@ -25,6 +25,7 @@ const copy = {
       h1b: 'Your money.',
       h1c: 'Your future.',
       sub: 'Thankly is the bilingual financial platform built for service workers. Collect digital tips, track every dollar, and build your financial future — all in one place.',
+      tagline: 'Scan. Tip. Done.',
       cta1: 'Join Founding 500 — Free',
       cta2: 'See how it works',
       stats: [
@@ -56,7 +57,7 @@ const copy = {
         { title: 'Create your profile', desc: 'Sign up free, add your photo, workplace, and personalized bio. Your public tip page is live in minutes.' },
         { title: 'Connect your bank', desc: 'Securely link your bank account through Stripe Express. Bank-level security, zero hassle.' },
         { title: 'Share your QR code', desc: 'Display your QR at your table, station, or workspace. Customers scan and tip in seconds.' },
-        { title: 'Get paid instantly', desc: 'Tips hit your Thankly account in real time. Cash out instantly or let it build — your choice.' },
+        { title: 'Get paid your way', desc: 'Tips land in your balance and pay out on your schedule — daily, weekly, or on demand. Eligible accounts can cash out in minutes.' },
       ],
     },
     features: {
@@ -140,7 +141,7 @@ const copy = {
       h2: 'Questions, answered.',
       items: [
         { q: 'How much does Thankly cost?', a: 'Free to join, no monthly fees. Thankly takes a small platform fee per tip — Founding 500 members lock in 2% for life vs. the 4% standard rate. Customers can choose to cover processing fees so you keep 100% of your tip.' },
-        { q: 'How fast do I get my money?', a: 'Tips land in your Thankly balance in real time. Cash out with an instant payout in minutes, or a free standard payout that arrives in 1–2 business days.' },
+        { q: 'How fast do I get my money?', a: 'Tips appear in your balance as they come in. You choose your payout schedule — daily, weekly, or manual. Standard payouts arrive in 1–2 business days at no cost, and eligible accounts can use a fast payout to get funds in minutes.' },
         { q: 'Do I need special hardware?', a: 'No. Your QR code works from your phone screen, a printed card, or a sticker at your station. Customers scan with their phone camera — they don\'t need to download anything to tip you.' },
         { q: 'Does Thankly withhold my taxes?', a: 'No — the Tax Pocket is an estimation tool, not withholding. Set your estimated rate and Thankly tracks how much of each tip to set aside, plus gives you professional reports for tax season. Thankly doesn\'t provide tax advice.' },
         { q: 'Is Thankly really bilingual?', a: 'Yes — English and Spanish are built in from the ground up: your dashboard, your public tip page, notifications, everything.' },
@@ -201,6 +202,7 @@ const copy = {
       h1a: 'Tus propinas.',
       h1b: 'Tu dinero.',
       h1c: 'Tu futuro.',
+      tagline: 'Escanea. Propina. Listo.',
       sub: 'Thankly es la plataforma financiera bilingüe creada para trabajadores de servicio. Recibe propinas digitales, controla cada dólar y construye tu futuro financiero — todo en un solo lugar.',
       cta1: 'Únete al Founding 500 — Gratis',
       cta2: 'Mira cómo funciona',
@@ -233,7 +235,7 @@ const copy = {
         { title: 'Crea tu perfil', desc: 'Regístrate gratis, agrega tu foto, tu lugar de trabajo y tu bio personalizada. Tu página pública de propinas queda lista en minutos.' },
         { title: 'Conecta tu banco', desc: 'Vincula tu cuenta bancaria de forma segura con Stripe Express. Seguridad de nivel bancario, sin complicaciones.' },
         { title: 'Comparte tu código QR', desc: 'Muestra tu QR en tu mesa, estación o lugar de trabajo. Tus clientes escanean y te dan propina en segundos.' },
-        { title: 'Recibe tu dinero al instante', desc: 'Las propinas llegan a tu cuenta de Thankly en tiempo real. Retira al instante o deja que crezca — tú decides.' },
+        { title: 'Recibe tu dinero a tu manera', desc: 'Las propinas llegan a tu saldo y se pagan según tu frecuencia — diaria, semanal o cuando tú quieras. Las cuentas elegibles pueden retirar en minutos.' },
       ],
     },
     features: {
@@ -244,7 +246,7 @@ const copy = {
         { icon: '📱', title: 'Tu página personal de propinas', desc: 'Un perfil público en getthankly.com/tunombre. Tus clientes escanean tu QR, ven tu cara y te dan propina directamente.' },
         { icon: '💰', title: 'Quédate con el 100% de tu propina', desc: 'Cuando el cliente cubre la tarifa de procesamiento, recibes cada dólar que quiso darte. Cero deducciones de tu propina.' },
         { icon: '📊', title: 'Panel de ganancias en tiempo real', desc: 'Sigue tus propinas por día, semana o mes. Mira tendencias, tus mejores días y todo tu historial de transacciones — siempre al día.' },
-        { icon: '🏦', title: 'Retiros instantáneos o estándar', desc: '¿Necesitas dinero ya? Retiro instantáneo en minutos. O acumula y transfiere cuando tú quieras.' },
+        { icon: '🏦', title: 'Retiros rápidos o estándar', desc: '¿Necesitas dinero ya? Retiro rápido en minutos si eres elegible. O acumula y transfiere cuando tú quieras.' },
         { icon: '🧾', title: 'Tax Pocket estimado', desc: 'Define tu tasa estimada de impuestos y Thankly calcula cuánto apartar automáticamente. Sin sorpresas en la temporada de impuestos.' },
         { icon: '📄', title: 'Reportes nivel contabilidad', desc: 'Descarga reportes profesionales en PDF o Excel para cualquier rango de fechas. Perfectos para tus impuestos, solicitudes de préstamo o tus propios registros.' },
       ],
@@ -317,7 +319,7 @@ const copy = {
       h2: 'Tus dudas, resueltas.',
       items: [
         { q: '¿Cuánto cuesta Thankly?', a: 'Unirte es gratis y no hay mensualidades. Thankly cobra una pequeña tarifa de plataforma por propina — los miembros del Founding 500 aseguran el 2% de por vida vs. la tarifa estándar del 4%. Tus clientes pueden cubrir la tarifa de procesamiento para que recibas el 100% de tu propina.' },
-        { q: '¿Qué tan rápido recibo mi dinero?', a: 'Las propinas llegan a tu saldo de Thankly en tiempo real. Retira al instante en minutos, o con un retiro estándar gratis que llega en 1–2 días hábiles.' },
+        { q: '¿Qué tan rápido recibo mi dinero?', a: 'Las propinas aparecen en tu saldo a medida que llegan. Tú eliges tu frecuencia de pago — diaria, semanal o manual. Los retiros estándar llegan en 1–2 días hábiles sin costo, y las cuentas elegibles pueden usar un retiro rápido para recibir fondos en minutos.' },
         { q: '¿Necesito equipo especial?', a: 'No. Tu código QR funciona desde la pantalla de tu teléfono, una tarjeta impresa o una calcomanía en tu estación. Tus clientes escanean con la cámara de su teléfono — no necesitan descargar nada para darte propina.' },
         { q: '¿Thankly retiene mis impuestos?', a: 'No — el Tax Pocket es una herramienta de estimación, no una retención. Define tu tasa estimada y Thankly calcula cuánto apartar de cada propina, además de darte reportes profesionales para la temporada de impuestos. Thankly no ofrece asesoría fiscal.' },
         { q: '¿Thankly es realmente bilingüe?', a: 'Sí — inglés y español están integrados desde cero: tu panel, tu página pública de propinas, tus notificaciones, todo.' },
@@ -451,6 +453,10 @@ export default function HomePage() {
               <span className="text-[#00B4D8]">{c.hero.h1b}</span><br />
               {c.hero.h1c}
             </h1>
+
+            <p className="text-xl font-black text-[#00B4D8] tracking-tight mb-5">
+              {c.hero.tagline}
+            </p>
 
             <p className="text-lg text-white/75 leading-relaxed mb-10 max-w-[480px]">
               {c.hero.sub}
