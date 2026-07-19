@@ -84,6 +84,9 @@ export default function ServerTipClient({
   const [customAmount, setCustomAmount] = useState("");
   const [billAmount, setBillAmount] = useState("");
   const [tipPercent, setTipPercent] = useState("18");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportSending, setReportSending] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
 
   const t = {
     headline: language === "en" ? `Thank ${displayName}` : `Agradece a ${displayName}`,
@@ -132,6 +135,23 @@ export default function ServerTipClient({
       return "";
     }
   }, [pageUrl]);
+
+  async function submitReport(reason: string) {
+    if (reportSending) return;
+    try {
+      setReportSending(true);
+      await fetch("/api/report-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, reason }),
+      });
+    } catch {
+      // fail quietly — don't expose internals to public visitors
+    } finally {
+      setReportSending(false);
+      setReportSent(true);
+    }
+  }
 
   const customAmountCents = useMemo(() => {
     const amount = Number(customAmount);
@@ -571,8 +591,80 @@ export default function ServerTipClient({
           </p>
           </>
           )}
+
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => { setReportOpen(true); setReportSent(false); }}
+              className="text-xs text-slate-400 underline hover:text-slate-600"
+            >
+              {language === "en" ? "Report Profile" : "Reportar perfil"}
+            </button>
+          </div>
         </div>
       </div>
+
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            {reportSent ? (
+              <>
+                <p className="text-base font-bold text-slate-900">
+                  {language === "en" ? "Report received" : "Reporte recibido"}
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  {language === "en"
+                    ? "Thank you. Our team reviews reports within 24 hours."
+                    : "Gracias. Nuestro equipo revisa los reportes en 24 horas."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(false)}
+                  className="mt-5 w-full rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white"
+                >
+                  {language === "en" ? "Close" : "Cerrar"}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-bold text-slate-900">
+                  {language === "en" ? "Report this profile" : "Reportar este perfil"}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {language === "en" ? "Why are you reporting it?" : "¿Por qué lo reportas?"}
+                </p>
+                <div className="mt-4 space-y-2">
+                  {[
+                    { key: "inappropriate_content", en: "Inappropriate content", es: "Contenido inapropiado" },
+                    { key: "impersonation", en: "Impersonation", es: "Suplantación de identidad" },
+                    { key: "not_a_real_worker", en: "Not a real worker", es: "No es un trabajador real" },
+                    { key: "harassment", en: "Harassment", es: "Acoso" },
+                    { key: "spam", en: "Spam or scam", es: "Spam o estafa" },
+                    { key: "other", en: "Something else", es: "Otro motivo" },
+                  ].map((r) => (
+                    <button
+                      key={r.key}
+                      type="button"
+                      disabled={reportSending}
+                      onClick={() => submitReport(r.key)}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {language === "en" ? r.en : r.es}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(false)}
+                  className="mt-4 w-full text-sm text-slate-500"
+                >
+                  {language === "en" ? "Cancel" : "Cancelar"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
