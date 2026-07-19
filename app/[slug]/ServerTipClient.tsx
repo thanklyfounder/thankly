@@ -15,6 +15,8 @@ type ServerTipClientProps = {
   tipAmount2?: number | null;
   tipAmount3?: number | null;
   stripeOnboarded?: boolean;
+  isFoundingMember?: boolean;
+  foundingNumber?: number | null;
   success?: boolean;
   canceled?: boolean;
 };
@@ -72,6 +74,7 @@ export default function ServerTipClient({
   success,
   canceled,
   stripeOnboarded = true,
+  isFoundingMember = false,
 }: ServerTipClientProps) {
   const [language, setLanguage] = useState<Language>("en");
   const [selectedAmount, setSelectedAmount] = useState<TipAmount>("preset2");
@@ -183,7 +186,8 @@ export default function ServerTipClient({
 
   const feeBreakdown = useMemo(() => {
     const stripeRate = 0.029;
-    const thanklyRate = 0.04;
+    // Founding 500 members pay 2% for life; standard is 4%.
+    const thanklyRate = isFoundingMember ? 0.02 : 0.04;
     const fixedFee = 30;
 
     let totalCharge = amountInCents;
@@ -213,7 +217,7 @@ export default function ServerTipClient({
       thanklyFee,
       workerReceives,
     };
-  }, [amountInCents, coverFee]);
+  }, [amountInCents, coverFee, isFoundingMember]);
 
   const farParticles = useMemo(() => buildParticles(80, 100), []);
   const nearParticles = useMemo(() => buildParticles(50, 500), []);

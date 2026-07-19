@@ -45,6 +45,7 @@ export default async function ServerPage({ params, searchParams }: PageProps) {
       tipAmount2={worker.tip_amount_2}
       tipAmount3={worker.tip_amount_3}
       stripeOnboarded={worker.stripe_onboarded === true}
+      isFoundingMember={worker.is_founding_member === true}
       success={resolvedSearchParams.success === "true"}
       canceled={resolvedSearchParams.canceled === "true"}
     />

@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     const { data: worker, error: workerError } = await supabase
       .from("workers")
-      .select("id, full_name, profile_slug, stripe_account_id, stripe_onboarded, avatar_url")
+      .select("id, full_name, profile_slug, stripe_account_id, stripe_onboarded, avatar_url, is_founding_member")
       .eq("profile_slug", slug)
       .single();
 
@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
     // Fee calculations (unchanged from original)
-    const thanklyFeeRate = 0.04;
+    // Founding 500 members pay 2% for life; standard rate is 4%.
+    const thanklyFeeRate = worker.is_founding_member ? 0.02 : 0.04;
     const stripeFixedFee = 30;
     const stripePercentFee = 0.029;
 

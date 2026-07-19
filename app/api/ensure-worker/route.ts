@@ -60,7 +60,24 @@ export async function POST() {
       return NextResponse.json({ error: "Could not create profile." }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, slug: created.profile_slug, created: true });
+    // Claim a Founding 500 spot if any remain. Atomic and capped server-side;
+    // returns null once full. Non-blocking — a failure never breaks signup.
+    let foundingNumber: number | null = null;
+    try {
+      const { data: claimed } = await admin.rpc("claim_founding_spot", {
+        p_worker_id: created.id,
+      });
+      foundingNumber = typeof claimed === "number" ? claimed : null;
+    } catch (e) {
+      console.error("Founding spot claim failed (non-blocking):", e);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      slug: created.profile_slug,
+      created: true,
+      foundingNumber,
+    });
   } catch (e) {
     console.error("ensure-worker error:", e);
     return NextResponse.json({ error: "Unexpected error." }, { status: 500 });
