@@ -16,8 +16,35 @@ type Props = {
   effectiveDate: string
   version: string
   sections: Section[]
+  lang?: 'en' | 'es'
+  altLangHref?: string
   children: ReactNode
 }
+
+const chrome = {
+  en: {
+    back: 'Back to home',
+    updated: 'Updated',
+    version: 'Version',
+    altLang: 'Ver en Español',
+    links: [
+      { href: '/privacy', label: 'Privacy Policy' },
+      { href: '/terms', label: 'Terms of Service' },
+      { href: '/disclosures', label: 'Disclosures' },
+    ],
+  },
+  es: {
+    back: 'Volver al inicio',
+    updated: 'Actualizado',
+    version: 'Versión',
+    altLang: 'View in English',
+    links: [
+      { href: '/privacy/es', label: 'Política de Privacidad' },
+      { href: '/terms/es', label: 'Términos de Servicio' },
+      { href: '/disclosures/es', label: 'Divulgaciones' },
+    ],
+  },
+} as const
 
 export default function LegalLayout({
   badge,
@@ -26,8 +53,11 @@ export default function LegalLayout({
   effectiveDate,
   version,
   sections,
+  lang = 'en',
+  altLangHref,
   children,
 }: Props) {
+  const c = chrome[lang]
   const [activeId, setActiveId] = useState(sections[0]?.id ?? '')
 
   useEffect(() => {
@@ -59,8 +89,16 @@ export default function LegalLayout({
           href="/"
           className="text-white/65 text-sm font-medium hover:text-white transition-colors flex items-center gap-1"
         >
-          Back to home
+          {c.back}
         </Link>
+        {altLangHref && (
+          <Link
+            href={altLangHref}
+            className="text-white/65 text-sm font-medium hover:text-white transition-colors border border-white/25 rounded-full px-3 py-1 ml-4"
+          >
+            {c.altLang}
+          </Link>
+        )}
       </nav>
 
       <div className="bg-gradient-to-br from-[#0F2347] to-[#1B3A6B] px-[5%] pt-12 pb-10 text-white">
@@ -69,7 +107,7 @@ export default function LegalLayout({
             <span className="text-[#00B4D8] bg-[#00B4D8]/10 text-xs font-bold px-3 py-1 rounded-full">
               {badge}
             </span>
-            <span className="text-white/45 text-xs">Updated {effectiveDate}</span>
+            <span className="text-white/45 text-xs">{c.updated} {effectiveDate}</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-3 max-w-2xl">{title}</h1>
           <p className="text-white/70 text-base max-w-xl leading-relaxed">{description}</p>
@@ -102,7 +140,7 @@ export default function LegalLayout({
 
         <div className="flex-1 min-w-0 legal-content">
           <p className="text-sm text-[#718096] border-b border-slate-100 pb-6 mb-8">
-            Version {version} Thankly LLC getthankly.com
+            {c.version} {version} Thankly LLC getthankly.com
           </p>
           {children}
         </div>
@@ -110,11 +148,7 @@ export default function LegalLayout({
 
       <footer className="bg-[#0F2347] py-10 px-[5%] text-center">
         <div className="flex flex-wrap gap-5 justify-center mb-4">
-          {[
-            { href: '/privacy', label: 'Privacy Policy' },
-            { href: '/terms', label: 'Terms of Service' },
-            { href: '/disclosures', label: 'Disclosures' },
-          ].map((link) => (
+          {c.links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
