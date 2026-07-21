@@ -2,11 +2,6 @@
 
 import LegalLayout from '@/components/LegalLayout'
 
-export const metadata = {
-  title: 'Política de Privacidad | Thankly',
-  description: 'Política de Privacidad de Thankly LLC en español.',
-}
-
 const sections = [
   { id: 'generalidades', label: 'Generalidades' },
   { id: 'recopilamos', label: 'Qué información recopilamos' },

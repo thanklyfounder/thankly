@@ -1,9 +1,6 @@
-import LegalLayout from '@/components/LegalLayout'
+'use client'
 
-export const metadata = {
-  title: 'Divulgaciones | Thankly',
-  description: 'Divulgaciones requeridas de Thankly LLC en español.',
-}
+import LegalLayout from '@/components/LegalLayout'
 
 const sections = [
   { id: 'ingresos', label: 'Reportes de ingresos' },

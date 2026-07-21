@@ -2,11 +2,6 @@
 
 import LegalLayout from '@/components/LegalLayout'
 
-export const metadata = {
-  title: 'Términos de Servicio | Thankly',
-  description: 'Términos de Servicio de Thankly LLC en español.',
-}
-
 const sections = [
   { id: 'cuentas', label: 'Cuentas y elegibilidad' },
   { id: 'stripe', label: 'Stripe y pagos' },
