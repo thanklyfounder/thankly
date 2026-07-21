@@ -23,7 +23,8 @@ export default function DisclosuresPage() {
       title="What we're required to tell you"
       description="Earnings, taxes, payments, and communications, explained plainly. These disclosures exist so nothing about how Thankly works is a surprise."
       effectiveDate="June 24, 2026"
-      version="1.5"
+      version="1.6"
+      altLangHref="/disclosures/es"
       sections={sections}
     >
       <section id="earnings">

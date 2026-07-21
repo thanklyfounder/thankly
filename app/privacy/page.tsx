@@ -24,7 +24,8 @@ export default function PrivacyPage() {
       title="Privacy & how we handle your data"
       description="We don't sell your information and we don't run ads. Here's exactly what we collect, why, and how long we keep it."
       effectiveDate="June 24, 2026"
-      version="1.5"
+      version="1.6"
+      altLangHref="/privacy/es"
       sections={sections}
     >
       <section id="overview">

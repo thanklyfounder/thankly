@@ -28,7 +28,8 @@ export default function TermsPage() {
       title="Terms of service"
       description="The rules for using Thankly, written as plainly as a legal agreement allows. By creating an account, you agree to these terms."
       effectiveDate="June 24, 2026"
-      version="1.5"
+      version="1.6"
+      altLangHref="/terms/es"
       sections={sections}
     >
       <section id="overview">
@@ -67,6 +68,18 @@ export default function TermsPage() {
 
         <h3>Platform fee</h3>
         <p>A fee is charged per transaction as displayed at time of payment. Current rates at getthankly.com/fees. Rate changes are communicated 30 days in advance.</p>
+
+        <h3>Founding 500 lifetime rate</h3>
+        <p>The first five hundred (500) Worker accounts to claim a Founding Member position (&#x201C;Founding 500 Members&#x201D;) receive a permanently reduced Thankly platform fee of two percent (2%) per transaction, in place of the standard rate, subject to the following terms:</p>
+        <ul>
+          <li><strong>What it covers.</strong> The 2% rate applies only to the Thankly platform fee. It does not apply to payment processing fees charged by our payment processor, which are separate and set by that processor.</li>
+          <li><strong>How membership is determined.</strong> Founding Member positions are assigned automatically in the order accounts are created, up to a maximum of 500. Once 500 positions are claimed, the program closes permanently and no further positions will be issued. Your Founding Member number, if assigned, is shown on your account.</li>
+          <li><strong>Duration.</strong> The 2% rate applies for as long as the account remains open and in good standing. It is not limited to a promotional period, and Thankly will not increase the platform fee for Founding 500 Members even if standard rates change for other users.</li>
+          <li><strong>Non-transferable.</strong> Founding Member status is personal to the account holder. It cannot be sold, transferred, assigned, or moved to another account, and it does not transfer if the account is closed and a new account is later created.</li>
+          <li><strong>Good standing.</strong> Founding Member status and the associated rate may be revoked if the account is terminated or suspended for violation of these Terms, including fraud, abuse, or creating multiple accounts to obtain additional Founding positions.</li>
+          <li><strong>Program changes.</strong> Thankly may modify or discontinue the Founding 500 program for accounts not yet enrolled. Any such change will not affect the 2% rate already granted to existing Founding 500 Members.</li>
+        </ul>
+        <p>Benefits described in Thankly&#x2019;s Founding 500 marketing materials other than the platform fee rate &#x2014; including badges, physical materials, early feature access, and contest eligibility &#x2014; are provided at Thankly&#x2019;s discretion and may change over time. Contest participation is governed by the Official Contest Rules at getthankly.com/contest-rules.</p>
 
         <h3>Earnings reports</h3>
         <p>PDF and Excel reports are informational tools only, not audited statements.</p>
