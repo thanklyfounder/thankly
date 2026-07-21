@@ -18,14 +18,13 @@ const sections = [
 export default function DisclosuresEsPage() {
   return (
     <LegalLayout
-      docNumber="03"
-      audience="Todos los usuarios"
+      badge="Divulgaciones"
       title="Lo que estamos obligados a informarte"
+      description="Traducción al español proporcionada únicamente para comodidad del usuario. La versión en inglés es el texto legalmente vinculante."
       effectiveDate="24 de junio de 2026"
       version="1.6"
       lang="es"
       altLangHref="/disclosures"
-      summary="Traducción al español proporcionada únicamente para comodidad del usuario. La versión en inglés es el texto legalmente vinculante."
       sections={sections}
     >
       <section id="idioma-aviso">

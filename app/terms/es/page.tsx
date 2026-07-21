@@ -1,3 +1,5 @@
+'use client'
+
 import LegalLayout from '@/components/LegalLayout'
 
 export const metadata = {
@@ -23,14 +25,13 @@ const sections = [
 export default function TermsEsPage() {
   return (
     <LegalLayout
-      docNumber="02"
-      audience="Todos los usuarios"
+      badge="Términos"
       title="Términos de Servicio"
+      description="Traducción al español proporcionada únicamente para comodidad del usuario. La versión en inglés es el texto legalmente vinculante."
       effectiveDate="24 de junio de 2026"
       version="1.6"
       lang="es"
       altLangHref="/terms"
-      summary="Traducción al español proporcionada únicamente para comodidad del usuario. La versión en inglés es el texto legalmente vinculante."
       sections={sections}
     >
       {/* ─────────────────────────────────────────────────────────────
