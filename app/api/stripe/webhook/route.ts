@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       }
 
 
-      const taxRate = Number(worker?.tax_withholding_rate ?? 0.25);
+      const taxRate = Number(worker?.tax_withholding_rate ?? 0);
       const taxReserveAmount = Math.round(workerReceives * taxRate);
       const availableAmount = workerReceives - taxReserveAmount;
 
@@ -98,25 +98,42 @@ export async function POST(req: NextRequest) {
         .order("started_at", { ascending: false })
         .maybeSingle();
 
-      const { error } = await supabase.from("transactions").insert({
-        worker_id: workerId,
-        business_id: activeShift?.business_id ?? null,
-        shift_id: activeShift?.id ?? null,
-        tip_amount: tipAmount,
-        fee_amount: thanklyFee,
-        stripe_fee: stripeFee,
-        worker_receives: workerReceives,
-        tax_reserve_amount: taxReserveAmount,
-        available_amount: availableAmount,
-        customer_covered_fee: customerCoveredFee,
-        stripe_payment_id: paymentIntentId,
-        status: "completed",
-      });
+      const { data: insertedTx, error } = await supabase
+        .from("transactions")
+        .insert({
+          worker_id: workerId,
+          business_id: activeShift?.business_id ?? null,
+          shift_id: activeShift?.id ?? null,
+          tip_amount: tipAmount,
+          fee_amount: thanklyFee,
+          stripe_fee: stripeFee,
+          worker_receives: workerReceives,
+          tax_reserve_amount: taxReserveAmount,
+          available_amount: availableAmount,
+          customer_covered_fee: customerCoveredFee,
+          stripe_payment_id: paymentIntentId,
+          status: "completed",
+        })
+        .select("id")
+        .single();
 
 
       if (error) {
         console.error("Error inserting transaction:", error);
         return new NextResponse("Database insert failed", { status: 500 });
+      }
+
+      // Affiliate commission accrual. Non-blocking — a failure here must never
+      // fail the webhook, or Stripe will retry and duplicate the transaction.
+      // Idempotent server-side via UNIQUE(transaction_id).
+      if (insertedTx?.id) {
+        try {
+          await supabase.rpc("accrue_affiliate_commission", {
+            p_transaction_id: insertedTx.id,
+          });
+        } catch (e) {
+          console.error("Affiliate accrual failed (non-blocking):", e);
+        }
       }
 
 

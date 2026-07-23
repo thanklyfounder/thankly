@@ -72,6 +72,32 @@ export async function POST() {
       console.error("Founding spot claim failed (non-blocking):", e);
     }
 
+    // Affiliate referral capture. Non-blocking — a failure here must never
+    // break signup. Recorded as 'pending'; earnings only accrue once the
+    // worker passes the four-condition activation gate.
+    const refCode = (user.user_metadata?.ref_code as string | undefined)
+      ?.trim()
+      .toUpperCase();
+
+    if (refCode) {
+      try {
+        const { data: affiliate } = await admin
+          .from("affiliates")
+          .select("id, status")
+          .eq("referral_code", refCode)
+          .maybeSingle();
+
+        if (affiliate && affiliate.status === "active") {
+          await admin.from("affiliate_referrals").insert({
+            affiliate_id: affiliate.id,
+            referred_worker_id: created.id,
+          });
+        }
+      } catch (e) {
+        console.error("Affiliate referral capture failed (non-blocking):", e);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       slug: created.profile_slug,

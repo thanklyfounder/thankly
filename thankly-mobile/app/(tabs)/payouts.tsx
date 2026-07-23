@@ -467,11 +467,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.15)",
+    borderTopColor: "#e2e8f0",
   },
   scheduleNoteText: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.8)",
+    color: "#475569",
     textAlign: "center",
     lineHeight: 17,
   },

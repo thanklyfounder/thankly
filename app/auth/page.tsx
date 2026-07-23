@@ -14,6 +14,7 @@ function AuthContent() {
   const router = useRouter();
   const [view, setView] = useState<View>("select");
   const [showForgot, setShowForgot] = useState(false);
+  const [refCode, setRefCode] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
 
   useEffect(() => {
@@ -24,7 +25,20 @@ function AuthContent() {
       return;
     }
 
-    const role = new URLSearchParams(window.location.search).get("role");
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      const clean = ref.trim().toUpperCase().slice(0, 32);
+      setRefCode(clean);
+      try { sessionStorage.setItem("thankly_ref", clean); } catch {}
+    } else {
+      try {
+        const stored = sessionStorage.getItem("thankly_ref");
+        if (stored) setRefCode(stored);
+      } catch {}
+    }
+
+    const role = params.get("role");
     if (role === "business") {
       setView("business_signup");
     } else if (role === "worker") {
@@ -59,7 +73,10 @@ function AuthContent() {
       email: email.trim(),
       password,
       options: {
-        data: { full_name: fullName.trim() },
+        data: {
+          full_name: fullName.trim(),
+          ...(refCode ? { ref_code: refCode } : {}),
+        },
         emailRedirectTo: "https://getthankly.com/auth/confirm?next=create",
       },
     });
@@ -137,6 +154,14 @@ function AuthContent() {
 
       if (signInError) {
         setError("Incorrect email or password. Please try again.");
+        return;
+      }
+
+      // Affiliates are identified by the affiliate flag in signup metadata.
+      // No worker or business record — straight to their dashboard, which
+      // calls the invite-gated, idempotent ensure route.
+      if (data.user.user_metadata?.affiliate === true) {
+        router.push("/affiliates/dashboard");
         return;
       }
 

@@ -68,6 +68,21 @@ function ConfirmContent() {
       return;
     }
 
+    // Affiliates: provision via the invite-gated ensure route, then go to the
+    // affiliate dashboard. NO worker row is created for affiliates.
+    if (next === "affiliate") {
+      try {
+        setContinuing(true);
+        const res = await fetch("/api/affiliates/ensure", { method: "POST" });
+        window.location.href = res.ok
+          ? "/affiliates/dashboard"
+          : "/affiliates/join";
+      } catch {
+        window.location.href = "/auth";
+      }
+      return;
+    }
+
     // Workers: provision the row now (Stripe deferred), then go to the dashboard.
     try {
       setContinuing(true);

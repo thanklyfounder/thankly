@@ -13,7 +13,7 @@ const copy = {
       links: [
         { href: '#how-it-works', label: 'How it works' },
         { href: '#features', label: 'Features' },
-        { href: '#founding', label: 'Founding 500' },
+        { href: '/founding500', label: 'Founding 500' },
         { href: '#business', label: 'For Business' },
       ],
       signin: 'Sign in',
@@ -100,7 +100,6 @@ const copy = {
       cta: "Claim your spot — It's free",
       spotsTitle: 'Founding Member Spots',
       spotsSub: 'Limited. First come, first served.',
-      spotsRemaining: '383 spots remaining',
     },
     business: {
       eyebrow: 'For businesses',
@@ -156,7 +155,7 @@ const copy = {
           links: [
             { href: '#how-it-works', label: 'How it works' },
             { href: '#features', label: 'Features' },
-            { href: '#founding', label: 'Founding 500' },
+            { href: '/founding500', label: 'Founding 500' },
             { href: '#business', label: 'For Business' },
           ],
         },
@@ -191,7 +190,7 @@ const copy = {
       links: [
         { href: '#how-it-works', label: 'Cómo funciona' },
         { href: '#features', label: 'Funciones' },
-        { href: '#founding', label: 'Founding 500' },
+        { href: '/founding500', label: 'Founding 500' },
         { href: '#business', label: 'Para negocios' },
       ],
       signin: 'Inicia sesión',
@@ -278,7 +277,6 @@ const copy = {
       cta: 'Reclama tu lugar — Es gratis',
       spotsTitle: 'Lugares de Miembro Fundador',
       spotsSub: 'Limitados. Por orden de llegada.',
-      spotsRemaining: 'Quedan 383 lugares',
     },
     business: {
       eyebrow: 'Para negocios',
@@ -334,7 +332,7 @@ const copy = {
           links: [
             { href: '#how-it-works', label: 'Cómo funciona' },
             { href: '#features', label: 'Funciones' },
-            { href: '#founding', label: 'Founding 500' },
+            { href: '/founding500', label: 'Founding 500' },
             { href: '#business', label: 'Para negocios' },
           ],
         },
@@ -368,6 +366,16 @@ const copy = {
 export default function HomePage() {
   const [lang, setLang] = useState<Lang>('en')
   const c = copy[lang]
+  const [spotsLeft, setSpotsLeft] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/founding-counter')
+      .then(r => r.json())
+      .then(d => { if (!cancelled && typeof d?.remaining === 'number') setSpotsLeft(d.remaining) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -673,9 +681,18 @@ export default function HomePage() {
               <div className="text-white font-bold mt-2">{c.founding.spotsTitle}</div>
               <div className="text-white/50 text-sm mb-6">{c.founding.spotsSub}</div>
               <div className="bg-white/10 rounded-full h-2 overflow-hidden mb-2">
-                <div className="h-full bg-gradient-to-r from-[#00B4D8] to-[#90E0EF] rounded-full w-[23%]" />
+                <div
+                  className="h-full bg-gradient-to-r from-[#00B4D8] to-[#90E0EF] rounded-full transition-all duration-500"
+                  style={{ width: `${spotsLeft === null ? 0 : Math.round(((500 - spotsLeft) / 500) * 100)}%` }}
+                />
               </div>
-              <div className="text-white/50 text-xs text-right">{c.founding.spotsRemaining}</div>
+              <div className="text-white/50 text-xs text-right">
+                {spotsLeft === null
+                  ? '—'
+                  : lang === 'es'
+                    ? `Quedan ${spotsLeft} lugares`
+                    : `${spotsLeft} spots remaining`}
+              </div>
             </div>
           </div>
         </div>
