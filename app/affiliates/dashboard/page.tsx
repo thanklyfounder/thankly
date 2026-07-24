@@ -82,6 +82,12 @@ export default function AffiliateDashboardPage() {
         return;
       }
 
+      // Provision on first load. Idempotent and invite-gated — mirrors
+      // ensure-worker. Required because the confirm page's auto-provision only
+      // runs when the session survives the email round trip; users who land
+      // here via sign-in instead would otherwise never get an affiliate row.
+      await fetch("/api/affiliates/ensure", { method: "POST" });
+
       const res = await fetch("/api/affiliates/summary");
       if (cancelled) return;
 
